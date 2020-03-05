@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="author" content="SHOP++ Team">
+    <meta name="copyright" content="SHOP++">
+    <title>订单结算 - 聚点商城</title>
+    <link href="/favicon.ico" rel="icon">
+    <link href="/resources/common/css/bootstrap.css" rel="stylesheet">
+    <link href="/resources/common/css/iconfont.css" rel="stylesheet">
+    <link href="/resources/common/css/font-awesome.css" rel="stylesheet">
+    <link href="/resources/common/css/awesome-bootstrap-checkbox.css" rel="stylesheet">
+    <link href="/resources/common/css/base.css" rel="stylesheet">
+    <link href="/resources/shop/css/base.css" rel="stylesheet">
+    <link href="/resources/shop/css/order.css" rel="stylesheet">
+    <link href="/resources/common/css/new/backup.css"  rel="stylesheet">
+    <script src="/resources/common/js/new/jquery.min.js"></script>
+	<script src="/resources/common/js/new/bootstrap.min.js"></script></script>
+	<script src="/resources/common/js/new/jquery.bootstrap-growl.min.js"></script>
+    <script src="/resources/common/js/jquery.lSelect.js"></script>
+    <script src="/resources/common/js/jquery.qrcode.js"></script>
+    <script src="/resources/common/js/new/jquery.validate.min.js" ></script>
+    <script src="/resources/common/js/jquery.validate.additional.js"></script>
+    <script src="/resources/common/js/new/jquery.form.min.js"></script>
+    <script src="/resources/common/js/jquery.cookie.js"></script>
+    <script src="/resources/common/js/new/lodash.min.js"></script>
+    <script src="/resources/common/js/new/URI.min.js"></script>
+    <script src="/resources/common/js/new/velocity.min.js"></script>
+    <script src="/resources/common/js/new/velocity.ui.min.js"></script>
+    <script src="/resources/common/js/base.js"></script>
+    <style>
+       .has-warning .help-block
+        {
+            width: 100px;
+            display: inline-block;
+            margin-left: 10px;
+        }</style></style>
+    <script src="/resources/shop/js/base.js"></script>
+    <script id="receiverListItemTemplate" type="text/template">
+        <li class="active">
+                <h5 class="text-overflow" title="<%-receiver.consignee%>">
+                    <%-receiver.consignee%>
+                </h5>
+                <p class="text-gray-dark">
+                    <%-receiver.phone%>
+                </p>
+                <p class="text-overflow" title="<%-receiver.areaName%><%-receiver.address%>">
+                    <%-receiver.areaName%>
+                        <%-receiver.address%>
+                </p>
+                <p class="text-gray-dark">
+                    <%-receiver.zipCode%>
+                </p>
+                </li>
+    </script>
+    <script>
+        $().ready(function() {
+
+            var $document = $(document);
+            var $addReceiverForm = $("#addReceiverForm");
+            var $addReceiverModal = $("#addReceiverModal");
+            var $areaId = $("#areaId");
+            var $receiver = $("#receiver");
+            var $receiverList = $("#receiver .receiver-list");
+            var $expandReceiver = $("#receiver .expand-receiver");
+            var $orderForm = $("#orderForm");
+            var $receiverId = $("#receiverId");
+            var $paymentMethodId = $("#paymentMethodId");
+            var $shippingMethodId = $("#shippingMethodId");
+            var $paymentMethod = $("#paymentMethod");
+            var $paymentMethodListItem = $("#paymentMethod .payment-method-list li");
+            var $shippingMethodListItem = $("#shippingMethod .shipping-method-list li");
+            var $isInvoice = $("#isInvoice");
+            var $invoiceTitle = $("#invoiceTitle");
+            var $invoiceTaxNumber = $("#invoiceTaxNumber");
+            var $couponName = $("#couponName");
+            var $couponCode = $("#couponCode");
+            var $balanceWrapper = $("#balanceWrapper");
+            var $useBalance = $("#useBalance");
+            var $balance = $("#balance");
+            var $promotionDiscount = $("#promotionDiscount");
+            var $couponDiscount = $("#couponDiscount");
+            var $tax = $("#tax");
+            var $freight = $("#freight");
+            var $amountPayable = $("#amountPayable");
+            var $exchangePoint = $("#exchangePoint");
+
+            var amount = 1299;
+            var amountPayable = 1299;
+            var paymentMethodIds = {};
+            paymentMethodIds["1"] = [1];
+            paymentMethodIds["2"] = [1, 2];
+            var addressId = ''
+            // 地区选择
+            $areaId.lSelect({
+                url: "/common/area"
+            });
+            // 添加收货地址表单验证
+            $addReceiverForm.validate({
+                rules: {
+                    province:"required",
+                    city:"required",
+                    area:"required",
+                    consignee: "required",
+
+                    areaId: "required",
+                    address: "required",
+                    zipCode: {
+                        required: true,
+                        zipCode: true
+                    },
+                    phone: {
+                        required: true,
+                        phone: true
+                    }
+                },
+                submitHandler: function(data) {
+                    sessionStorage.setItem('addressId',1)
+                    $addReceiverModal.modal("hide");
+                    $('.receiver-list').html(receiverListItemTemplate({
+                    receiver: {
+                        phone:$("[name=phone]").val(),
+                        consignee:$("[name=consignee]").val(),
+                        province:$("[name=province]").val(),
+                        address:$("[name=address]").val(),
+                        zipCode:$("[name=zipCode]").val(),
+                    }
+
+                }))
+
+                    $.bootstrapGrowl('添加成功', {
+                    type: "success",
+                    offset: {from: 'bottom', amount: 20},
+                });
+            }
+            });
+            var receiverListItemTemplate = _.template($("#receiverListItemTemplate").html());
+            // 添加收货地址成功
+            // $addReceiverForm.on("success.shopxx.ajaxSubmit", function(event, data) {
+            //      console.log(event, data);
+            //     var $element = $(this);
+            //     $element.find(":submit").prop("disabled", false).removeClass("btn-before-submit");
+            //     $element.resetForm();
+            //     $receiverId.val(data.id);
+            //     $addReceiverModal.modal("hide");
+            //     $(receiverListItemTemplate({
+            //         currentReceiverId: data.id,
+            //         receiver: data
+            //     })).prependTo($receiverList).siblings().removeClass("active");
+            //     if ($receiverList.find("li").length > 3 && !$receiver.hasClass("expanded")) {
+            //         $expandReceiver.closest(".panel-footer").show();
+            //     }
+            //     calculate();
+            // });
+
+            // 收货地址
+            $receiverList.on("click", "li", function() {
+                var $element = $(this);
+                var receiverId = $element.data("receiver-id");
+
+                $receiverId.val(receiverId);
+                $element.addClass("active").siblings().removeClass("active");
+                // calculate();
+            });
+
+            // 收货地址
+            $expandReceiver.click(function() {
+                var $element = $(this);
+
+                $element.closest(".panel-footer").hide();
+                $receiver.addClass("expanded");
+            });
+
+            // 支付方式
+            $paymentMethodListItem.click(function() {
+                var $element = $(this);
+                if ($element.hasClass("disabled")) {
+                    return;
+                }
+
+                var paymentMethodId = $element.data("payment-method-id");
+                $paymentMethodId.val(paymentMethodId);
+                $element.addClass("active").siblings().removeClass("active");
+
+                $shippingMethodListItem.each(function() {
+                    var $element = $(this);
+                    var shippingMethodId = $element.data("shipping-method-id");
+
+                    if ($.inArray(paymentMethodId, paymentMethodIds[shippingMethodId]) >= 0) {
+                        $element.removeClass("disabled");
+                    } else {
+                        $element.addClass("disabled");
+                        if ($element.hasClass("active")) {
+                            $element.removeClass("active");
+                            $shippingMethodId.val("");
+                        }
+                    }
+                });
+                // calculate();
+            });
+
+            // 配送方式
+            $shippingMethodListItem.click(function() {
+                var $element = $(this);
+                if ($element.hasClass("disabled")) {
+                    return;
+                }
+
+                var shippingMethodId = $element.data("shipping-method-id");
+                $shippingMethodId.val(shippingMethodId);
+                $element.addClass("active").siblings().removeClass("active");
+
+                $paymentMethodListItem.each(function() {
+                    var $element = $(this);
+                    var paymentMethodId = $element.data("payment-method-id");
+
+                    if ($.inArray(paymentMethodId, paymentMethodIds[shippingMethodId]) >= 0) {
+                        $element.removeClass("disabled");
+                    } else {
+                        $element.addClass("disabled");
+                        if ($element.hasClass("active")) {
+                            $element.removeClass("active");
+                            $paymentMethodId.val("");
+                        }
+                    }
+                });
+                // calculate();
+            });
+
+            // 开具发票
+            $isInvoice.change(function() {
+                // var $element = $(this);
+
+                // if ($element.is(":checked")) {
+                //     if ($invoiceTitle.prop("disabled")) {
+                //         $invoiceTitle.prop("disabled", false).closest(".form-group").velocity("slideDown");
+                //         $invoiceTaxNumber.prop("disabled", false).closest(".form-group").velocity("slideDown");
+                //     }
+                // } else {
+                //     if (!$invoiceTitle.prop("disabled")) {
+                //         $invoiceTitle.prop("disabled", true).closest(".form-group").velocity("slideUp");
+                //         $invoiceTaxNumber.prop("disabled", true).closest(".form-group").velocity("slideUp");
+                //     }
+                // }
+                // calculate();
+            });
+
+            // 发票抬头
+            $invoiceTitle.focus(function() {
+                var $element = $(this);
+
+                if ($.trim($element.val()) === "个人") {
+                    $element.val("");
+                }
+            });
+
+            // 发票抬头
+            $invoiceTitle.blur(function() {
+                var $element = $(this);
+
+                if ($.trim($element.val()) === "") {
+                    $element.val("个人");
+                }
+            });
+
+            // 优惠券名称
+            $couponName.click(function() {
+                var $element = $(this);
+
+                $element.velocity("fadeOut", {
+                    complete: function() {
+                        $couponCode.show().focus();
+                    }
+                });
+            });
+
+            // 优惠码
+            $couponCode.blur(function() {
+                var $element = $(this);
+
+                if ($.trim($element.val()) !== "") {
+                    $.get("/order/check_coupon", {
+                        skuId: 159,
+                        quantity: 1,
+                        code: $element.val()
+                    }).done(function(data) {
+                        $couponCode.hide();
+                        $couponName.text(data.couponName).velocity("fadeIn", {
+                            display: "inline-block"
+                        });
+                        // calculate();
+                    });
+                } else {
+                    // calculate();
+                }
+            });
+
+            // 使用余额
+            $useBalance.change(function() {
+                var $element = $(this);
+
+                if ($element.is(":checked")) {
+                    if ($balance.prop("disabled")) {
+                        $balance.prop("disabled", false).closest(".form-group").velocity("slideDown");
+                    }
+                } else {
+                    if (!$balance.prop("disabled")) {
+                        $balance.prop("disabled", true).closest(".form-group").velocity("slideUp");
+                    }
+                }
+                // calculate();
+            });
+
+            // 余额
+            $balance.change(function() {
+                var $element = $(this);
+
+                if (/^\d+(\.\d{0,2})?$/.test($element.val())) {
+                    var max = 0 >= amount ? amount : 0;
+                    if (parseFloat($element.val()) > max) {
+                        $element.val(max);
+                    }
+                } else {
+                    $element.val("0");
+                }
+                // calculate();
+            });
+
+            // 订单表单验证
+            $orderForm.validate({
+                rules: {
+                    receiverId: "required",
+                    shippingMethodId: "required",
+                    paymentMethodId: {
+                        required: function() {
+                            return amountPayable > 0;
+                        }
+                    }
+                },
+                messages: {
+                    receiverId: {
+                        required: "必须新增一个收货地址"
+                    },
+                    shippingMethodId: {
+                        required: "请选择配送方式"
+                    },
+                    paymentMethodId: {
+                        required: "请选择支付方式"
+                    }
+                },
+                submitHandler: function(form) {
+                    $(form).ajaxSubmit({
+                        successRedirectUrl: function(redirectUrlParameterName, data, textStatus, xhr, $form) {
+                            $.removeCurrentCartQuantity();
+                            if (amountPayable > 0) {
+                                return "/order/payment?" + $.param({
+                                    orderSns: data.orderSns
+                                });
+                            } else {
+                                return "/member/order/list";
+                            }
+                        }
+                    }).on("success.shopxx.ajaxSubmit", function() {
+                        $document.trigger("checkout.shopxx.order", arguments);
+                    });
+                },
+                invalidHandler: function(event, validator) {
+                    $.bootstrapGrowl(validator.errorList[0].message, {
+                        type: "warning"
+                    });
+                },
+                errorPlacement: $.noop
+            });
+
+
+
+            // 计算
+            function calculate() {
+                $.get("/order/calculate", $orderForm.serialize()).done(function(data) {
+                    if (data.amount != amount) {
+                        $balance.val("0");
+                        amountPayable = data.amount;
+                    } else {
+                        amountPayable = data.amountPayable;
+                    }
+                    amount = data.amount;
+                    if (amountPayable > 0) {
+                        if ($paymentMethod.is(":hidden")) {
+                            $paymentMethod.velocity("slideDown");
+                        }
+                        $paymentMethodId.prop("disabled", false);
+                        if ($balanceWrapper.is(":hidden")) {
+                            $balanceWrapper.velocity("slideDown");
+                        }
+                    } else {
+                        if ($paymentMethod.is(":visible")) {
+                            $paymentMethod.velocity("slideUp");
+                        }
+                        $shippingMethodListItem.removeClass("disabled");
+                        $paymentMethodId.prop("disabled", true);
+                        if (parseFloat($balance.val()) <= 0) {
+                            if ($balanceWrapper.is(":visible")) {
+                                $balanceWrapper.velocity("slideUp");
+                            }
+                        }
+                    }
+                    $promotionDiscount.text($.currency(data.promotionDiscount, true, true));
+                    $couponDiscount.text($.currency(data.couponDiscount, true, true));
+                    $tax.text($.currency(data.tax, true, true));
+                    $freight.text($.currency(data.freight, true, true));
+                    $amountPayable.text($.currency(amountPayable, true, true));
+                    $exchangePoint.text(data.exchangePoint);
+                });
+            }
+
+        });
+
+
+    </script>
+</head>
+
+<body class="shop order-checkout">
+    <script id="mainHeaderMemberInfoTemplate" type="text/template">
+	<%if (localStorage.getItem('username') != ''&&localStorage.getItem('username') != null) {%>
+		<ul class="list-inline">
+			<li>
+				<a><%-localStorage.getItem('username')%></a>
+			</li>
+			<li>
+				<a class="logout" href="/index.html">退出</a>
+			</li>
+		</ul>
+	<%} else {%>
+		<ul class="list-inline">
+			<li>
+				<a href="/member/login.html">登录</a>
+			</li>
+			<li>
+				<a href="/member/register.html">注册</a>
+			</li>
+		</ul>
+	<%}%>
+</script>
+    <script id="mainHeaderCartDetailTemplate" type="text/template">
+        <%if (!_.isEmpty(cart.cartItems)) {%>
+            <div class="cart-detail-body">
+                <ul>
+                    <%_.each(cart.cartItems, function(cartItem, i) {%>
+                        <li>
+                            <a href="<%-cartItem.skuPath%>">
+							<img src="<%-cartItem.skuThumbnail%>" alt="<%-cartItem.skuName%>">
+							<span class="text-overflow" title="<%-cartItem.skuName%>"><%-cartItem.skuName%></span>
+						</a>
+                            <span>
+							<strong><%-$.currency(cartItem.price, true, false)%></strong>
+							&times; <%-cartItem.quantity%>
+						</span>
+                        </li>
+                        <%});%>
+                </ul>
+            </div>
+            <div class="cart-detail-footer">
+                共计:
+                <strong><%-$.currency(cart.effectivePrice, true, true)%></strong>
+                <a class="pull-right" href="/cart/list.html">商品结算</a>
+            </div>
+            <%} else {%>
+                <p>您的购物车是空的，请去挑选您的商品！</p>
+                <%}%>
+    </script>
+    <script>
+        $().ready(function() {
+
+            var $document = $(document);
+            var $mainHeaderTopAd = $("#mainHeaderTopAd");
+            var $mainHeaderTopAdClose = $("#mainHeaderTopAd button.close");
+            var $mainHeaderMemberInfo = $("#mainHeaderMemberInfo");
+            var $mainHeaderProductSearchForm = $("#mainHeaderProductSearch form");
+            var $searchType = $("#mainHeaderProductSearch [data-search-type]");
+            var $mainHeaderProductSearchKeyword = $("#mainHeaderProductSearch input[name='keyword']");
+            var $mainHeaderCart = $("#mainHeaderCart");
+            var $mainHeaderCartQuantity = $("#mainHeaderCart em");
+            var $mainHeaderCartDetail = $("#mainHeaderCart div.cart-detail");
+            var $mainHeaderMainNavInkBar = $("#mainHeaderMainNav div.ink-bar");
+            var $mainHeaderMainNavItem = $("#mainHeaderMainNav li");
+            var $mainHeaderMainNavActiveItem = $("#mainHeaderMainNav li.active");
+            var mainHeaderMemberInfoTemplate = _.template($("#mainHeaderMemberInfoTemplate").html());
+            var mainHeaderCartDetailTemplate = _.template($("#mainHeaderCartDetailTemplate").html());
+
+
+
+            // 顶部广告
+            if (sessionStorage.getItem("mainHeaderTopAdHidden") == null) {
+                $mainHeaderTopAd.show();
+            }
+
+            // 顶部广告
+            $mainHeaderTopAdClose.click(function() {
+                sessionStorage.setItem("mainHeaderTopAdHidden", "true");
+                $mainHeaderTopAd.velocity("slideUp");
+            });
+
+            // 会员信息
+            $mainHeaderMemberInfo.html(mainHeaderMemberInfoTemplate({
+                currentUser: $.getCurrentUser()
+            }));
+
+            // 用户注销
+            $mainHeaderMemberInfo.on("click", "a.logout", function() {
+                localStorage.removeItem('username')
+                localStorage.removeItem('token')
+                localStorage.removeItem('authority')
+                window.location.href=document.referrer;
+                $document.trigger("loggedOut.shopxx.user", $.getCurrentUser());
+            });
+
+            // 搜索类型
+            $searchType.click(function() {
+                var $element = $(this);
+                var searchType = $element.data("search-type");
+
+                $element.closest("div.input-group").find("[data-toggle='dropdown'] span:not(.caret)").text($element.text());
+
+                switch (searchType) {
+                    case "product":
+                        $mainHeaderProductSearchForm.attr("action", "/product/search.html");
+                        break;
+                    case "store":
+                        $mainHeaderProductSearchForm.attr("action", "/store/search.html");
+                        break;
+                }
+            });
+
+            // 商品搜索
+            $mainHeaderProductSearchForm.submit(function() {
+                if ($.trim($mainHeaderProductSearchKeyword.val()) === "") {
+                    return false;
+                }
+            });
+
+            // 购物车
+            $mainHeaderCart.hover(function() {
+                var loading = true;
+
+                setTimeout(function() {
+                    if (loading) {
+                        $mainHeaderCartDetail.html('<div class="cart-loader"><span></span><span></span><span></span><span></span><span></span></div>');
+                    }
+                }, 500);
+                // $.getCurrentCart().done(function(data) {
+                //     loading = false;
+                //     $mainHeaderCartDetail.html(mainHeaderCartDetailTemplate({
+                //         cart: data
+                //     }));
+                // });
+            });
+
+            // 购物车数量
+            var currentCartQuantity = $.getCurrentCartQuantity();
+            if (currentCartQuantity != null) {
+                $mainHeaderCartQuantity.text(currentCartQuantity < 100 ? currentCartQuantity : "99+");
+            }
+
+            // 购物车数量
+            $document.on("complete.shopxx.setCurrentCartQuantity", function(event, quantity) {
+                $mainHeaderCartQuantity.text(quantity < 100 ? quantity : "99+");
+            });
+
+            // 主导航
+            if ($mainHeaderMainNavItem.length > 0) {
+                if ($mainHeaderMainNavActiveItem.length < 1) {
+                    $mainHeaderMainNavActiveItem = $mainHeaderMainNavItem.first();
+                }
+
+                $mainHeaderMainNavInkBar.css({
+                    width: $mainHeaderMainNavActiveItem.outerWidth(),
+                    display: "block",
+                    left: $mainHeaderMainNavActiveItem.position().left
+                });
+
+                $mainHeaderMainNavItem.hover(function() {
+                    var $element = $(this);
+
+                    $mainHeaderMainNavInkBar.css({
+                        width: $element.outerWidth(),
+                        left: $element.position().left
+                    });
+                }, function() {
+                    $mainHeaderMainNavInkBar.css({
+                        width: $mainHeaderMainNavActiveItem.outerWidth(),
+                        left: $mainHeaderMainNavActiveItem.position().left
+                    });
+                });
+            }
+
+        });
+    </script>
+    <header class="main-header">
+        <div id="mainHeaderTopAd" class="top-ad">
+            <button class="close" type="button">
+          <span>&times;</span>
+        </button>
+            <a href="https://demo.b2b2c.shopxx.net" target="blank">
+           <img src="https://image.demo.b2b2c.shopxx.net/6.0/cc976454-1494-43de-96a8-fda391c880a9.jpg" alt="空调0元安装放心购">
+          </a>
+        </div>
+
+        <div class="top-nav">
+<div class="container">
+<div class="row">
+<div class="col-xs-12">
+<div id="mainHeaderMemberInfo" class="pull-left"></div>
+<ul class="list-inline pull-right">
+<li>
+<a href="/member/login.html" >会员中心</a>
+</li>
+<li>
+<a href="/member/order/list.html" >我的订单</a>
+</li>
+<li class="top-nav-dropdown">
+<a href="javascript:;">
+商家服务
+<span class="caret"></span>
+</a>
+<ul class="business">
+<li>
+	<a href="/business/login-redirectUrl=-business-index.html" target="_blank">商家中心</a>
+</li>
+<li>
+<a href="/business/register.html" >商家入驻</a>
+</li>
+</ul>
+</li>
+
+
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+
+
+<div class="container">
+<div class="row">
+<div class="col-xs-3 logo-container" >
+    <a>
+        <img  class="logo-img" src="/images/logo.png"  alt="聚点商城">
+        <div class="logo-text" >
+            <h3>聚点商城</h3>
+        </div>
+    </a>
+</div>
+<div class="col-xs-6">
+<p class="empty-header-center-block"></p>
+</div>
+<div class="col-xs-3">
+
+</div>
+</div>
+<div class="row">
+<div class="col-xs-2">
+<a class="product-category" href="../../product_category.html" >
+<i class="iconfont icon-sort"></i>
+所有商品分类
+</a>
+</div>
+<div class="col-xs-10">
+<div id="mainHeaderMainNav" class="main-nav">
+<div class="ink-bar"></div>
+<ul>
+<li>
+<a href="/index.html" >首页</a>
+</li>
+<li>
+<a href="/product/list/1.html" >手机数码</a>
+</li>
+<li>
+<a href="/product/list/2.html" >办公家电</a>
+</li>
+<li>
+<a href="/product/list/3.html" >精品服饰</a>
+</li>
+<li>
+<a href="/product/list/4.html" >珠宝饰品</a>
+</li>
+<li>
+<a href="/product/list/5.html" >美妆护肤</a>
+</li>
+
+<li>
+    <a href="/product/list-type=EXCHANGE.html" >积分商城</a>
+</li>
+<li>
+<a href="/product/list-promotionPluginId=groupBuyingPromotionPlugin.html" >团购商城</a>
+</li>
+<li>
+<a href="/article/list/1.html" >商城动态</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+    </header>
+    <script id="buyProductTemplate" type="text/template">
+        <div>
+            <%if (!_.isEmpty(data,total)) {%>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th width="800">商品</th>
+                            <th>价格</th>
+                            <th>数量</th>
+                            <th width="150">小计</th>
+                        </tr>
+                    </thead>
+                    <%_.each(data, function(product, i) {%>
+                    <tbody class="order-item-group">
+
+                        <tr class="order-item-group-heading">
+
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="media">
+                                    <div class="media-left media-middle">
+                                        <a>
+                                            <img class="media-object img-thumbnail" src="<%-product.skuThumbnail%>">
+                                        </a>
+                                    </div>
+                                    <div class="media-body media-middle">
+                                        <h5 class="media-heading">
+                                            <a><%-product.skuName%></a>
+                                        </h5>
+                                        <span class="small text-gray"><%-product.specification?'['+product.specification+']':''%></span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><%-product.price?'￥'+product.price:'0.00'%> </td>
+                            <td> <%-product.quantity%></td>
+
+                            <td>
+                                <strong>￥<%-product.price*product.quantity%>.00</strong>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <%});%>
+                </table>
+                <div class="summary panel panel-default">
+                    <div class="panel-body">
+                        <dl class="dl-horizontal pull-right">
+   
+                            <dt>促销折扣:</dt>
+                            <dd>
+                                <span id="promotionDiscount">￥0.00元</span>
+                            </dd>
+                            <dt>优惠券折扣:</dt>
+                            <dd>
+                                <span id="couponDiscount">￥0.00元</span>
+                            </dd>
+                            <dt>税金:</dt>
+                            <dd>
+                                <span id="tax">￥0.00元</span>
+                            </dd>
+                            <dt>运费:</dt>
+                            <dd>
+                                <span id="freight">￥0.00元</span>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+                <div class="bar">
+                    <div class="row">
+                        <div class="col-xs-1">
+                            <a class="back" href="javascript:;" data-action="back"> < 返 回</a>
+                        </div>
+                        <div class="col-xs-10 text-right">
+                            <span>
+                                <span><%-textName%></span>
+                                <strong id="amountPayable"><%-textName==='兑换积分:'?data[0].rewardPoint:'￥'+total+'.00元'%> </strong>
+                            </span>
+                        </div>
+                        <div class="col-xs-1">
+                            <a class="btn btn-primary btn-lg btn-block"  id="orderAccount" >订单结算</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <%} else {%>
+                <p>暂无信息</p>
+                <%}%>
+    </script>
+
+    <script id="historyProductTemplate" type="text/template">
+        <h4>
+            浏览记录
+            <%if (!_.isEmpty(data)) {%>
+                <a class="clear pull-right" href="javascript:;">清空</a>
+                <%}%>
+        </h4>
+        <%if (!_.isEmpty(data)) {%>
+            <ul class="clearfix">
+                <%_.each(data, function(product, i) {%>
+                    <li>
+                        <a href="<%-product.path%>" target="_blank" rel="noopener noreferrer">
+						<img class="img-responsive center-block" src="<%-product.thumbnail != null ? product.thumbnail : "https://image.demo.b2b2c.shopxx.net/6.0/default_thumbnail_product_image.png"%>" alt="<%-product.name%>">
+						<h5 class="text-overflow" title="<%-product.name%>"><%-product.name%></h5>
+					</a>
+                    </li>
+                    <%});%>
+            </ul>
+            <%} else {%>
+                <p>暂无信息</p>
+                <%}%>
+    </script>
+    <script>
+        $().ready(function() {
+
+            var $window = $(window);
+            var $document = $(document);
+            var $body = $("body");
+            var $mainSidebar = $("#mainSidebar");
+            var $mainSidebarCartQuantity = $("#mainSidebarCart em");
+            var $mainSidebarTooltipToggle = $("#mainSidebar [data-toggle='tooltip']");
+            var $historyProductCollapse = $("#historyProductCollapse");
+            var $mainSidebarQrcodeContent = $("#mainSidebarQrcode div.content");
+            var $mainSidebarBackTop = $("#mainSidebarBackTop");
+            var $mainSidebarHistoryProduct = $("#mainSidebarHistoryProduct");
+            var mainSidebarBackTopHidden = true;
+            var mainSidebarExpanded = false;
+            var historyProductTemplate = _.template($("#historyProductTemplate").html());
+            var historyProductIdsLocalStorageKey = "historyProductIds";
+            var $buyProduct  = $('#buyProduct')
+
+            sessionStorage.setItem('addressId','')
+
+            //获取商品信息
+            var buyDatas = localStorage.getItem('buyDatas')?JSON.parse(localStorage.getItem('buyDatas')):{}
+            var buyProductTemplate = _.template($("#buyProductTemplate").html());
+            let productPrice  = 0
+
+            function getQueryVariable(variable)
+                {
+                    var query = window.location.search.substring(1);
+                    var vars = query.split("&");
+                    for (var i=0;i<vars.length;i++) {
+                            var pair = vars[i].split("=");
+                            if(pair[0] == variable){return pair[1];}
+                    }
+                    return(false);
+                }
+                if(getQueryVariable('page')==='cart'){
+                  buyDatas = JSON.parse(localStorage.getItem('cartDatas')).cartItems
+                }
+                var textName = ''
+                if(getQueryVariable('page')==='integral'){
+                    textName = '兑换积分:'
+                }else{
+                    textName = '应付金额:'
+                }
+                buyDatas.forEach((item,index) => {
+                    productPrice += (Number(item.price)*Number(item.quantity))
+                });
+
+            $buyProduct.html(buyProductTemplate({
+                data:buyDatas,
+                total:productPrice,
+                textName:textName
+            }))
+
+            var $orderAccount = $("#orderAccount");
+            $orderAccount.click(function(){
+                if(localStorage.getItem('username') == ''||localStorage.getItem('username') == null){
+                    $.bootstrapGrowl('请登录后操作', {
+                    type: "warning",
+                    offset: {from: 'bottom', amount: 20},
+                   });
+                   location.href ="/member/login.html"
+                   return
+                }
+
+                if(sessionStorage.getItem('addressId')){
+                    $.bootstrapGrowl('操作成功', {
+                    type: "success",
+                    offset: {from: 'bottom', amount: 20},
+                });
+                }else{
+                    $.bootstrapGrowl('请先填写地址', {
+                    type: "warning",
+                    offset: {from: 'bottom', amount: 20},
+                });
+                }
+
+            })
+            // 购物车数量
+            var currentCartQuantity = $.getCurrentCartQuantity();
+
+            if (currentCartQuantity != null) {
+                $mainSidebarCartQuantity.text(currentCartQuantity < 100 ? currentCartQuantity : "99+");
+            }
+
+            // 购物车数量
+            $document.on("complete.shopxx.setCurrentCartQuantity", function(event, quantity) {
+                $mainSidebarCartQuantity.text(quantity < 100 ? quantity : "99+");
+            });
+
+            // 提示
+            $mainSidebarTooltipToggle.tooltip();
+
+            // 浏览记录展开/折叠
+            // $document.on("click", function(e) {
+            //     if ($mainSidebar.data("collapse-disabled") === "true") {
+            //         return;
+            //     }
+            //     if ($historyProductCollapse[0] === e.target || $.contains($historyProductCollapse[0], e.target) || (mainSidebarExpanded && !$.contains($mainSidebar[0], e.target))) {
+            //         $mainSidebar.velocity({
+            //             right: mainSidebarExpanded ? -300 : 0
+            //         }, {
+            //             begin: function() {
+            //                 $mainSidebar.data("collapse-disabled", "true");
+            //                 if (!mainSidebarExpanded) {
+            //                     loadHistoryProduct();
+            //                 }
+            //             },
+            //             complete: function() {
+            //                 $mainSidebar.removeData("collapse-disabled");
+            //                 mainSidebarExpanded = !mainSidebarExpanded;
+            //             }
+            //         }, 500);
+            //     }
+            // });
+
+            // 加载浏览记录
+            function loadHistoryProduct() {
+                var historyProductIdsLocalStorage = localStorage.getItem(historyProductIdsLocalStorageKey);
+                var historyProductIds = historyProductIdsLocalStorage != null ? JSON.parse(historyProductIdsLocalStorage) : [];
+
+                $.get("/product/history", {
+                    productIds: historyProductIds
+                }).done(function(data) {
+                    localStorage.setItem(historyProductIdsLocalStorageKey, JSON.stringify($.map(data, function(item) {
+                        return item.id
+                    })));
+                    $mainSidebarHistoryProduct.html(historyProductTemplate({
+                        data: data
+                    }));
+                });
+            }
+
+            // 清空浏览记录
+            $mainSidebarHistoryProduct.on("click", ".clear", function() {
+                localStorage.removeItem(historyProductIdsLocalStorageKey);
+                $mainSidebarHistoryProduct.html(historyProductTemplate({
+                    data: {}
+                }));
+                return false;
+            });
+
+            // 二维码
+            $mainSidebarQrcodeContent.qrcode({
+                width: 100,
+                height: 100,
+                text: location.href
+            });
+
+            // 返回顶部
+            $window.scroll(_.throttle(function() {
+                if ($window.scrollTop() > 500) {
+                    if (mainSidebarBackTopHidden) {
+                        mainSidebarBackTopHidden = false;
+                        $mainSidebarBackTop.velocity("fadeIn");
+                    }
+                } else {
+                    if (!mainSidebarBackTopHidden) {
+                        mainSidebarBackTopHidden = true;
+                        $mainSidebarBackTop.velocity("fadeOut");
+                    }
+                }
+            }, 500));
+
+            // 返回顶部
+            $mainSidebarBackTop.click(function() {
+                $body.velocity("stop").velocity("scroll", {
+                    duration: 1000
+                });
+            });
+
+        });
+    </script>
+    <aside id="mainSidebar" class="main-sidebar clearfix">
+        <div class="main-sidebar-body">
+            <ul>
+
+                <li>
+                <a id="mainSidebarCart" class="cart" href="../../cart/list.html" >
+                <i class="iconfont icon-cart"></i>
+                <span>购物车</span>
+                <em>0</em>
+                </a>
+                </li>
+                <li>
+                <a href="../../member/order/list.html"  title="我的订单" data-toggle="tooltip" data-placement="left">
+                <i class="iconfont icon-form"></i>
+                </a>
+                </li>
+  
+                <li>
+                <a href="/member/product_favorite/list.html"  title="我的收藏" data-toggle="tooltip" data-placement="left">
+                <i class="iconfont icon-like"></i>
+                </a>
+                </li>
+                <li>
+                <a href="../..//member/coupon_code/list.html"  title="优惠券" data-toggle="tooltip" data-placement="left">
+                <i class="iconfont icon-ticket"></i>
+                </a>
+                </li>
+                <li>
+
+                </li>
+                </ul>
+            <a id="mainSidebarBackTop" class="back-top" href="javascript:;" title="返回顶部">
+			<i class="iconfont icon-top"></i>
+		</a>
+        </div>
+        <div class="main-sidebar-right">
+            <div id="mainSidebarHistoryProduct" class="history-product"></div>
+        </div>
+    </aside>
+    <main>
+        <div class="container">
+            <form id="addReceiverForm" class="ajax-form form-horizontal"   >
+                <div id="addReceiverModal" class="modal fade" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <button class="close" type="button" data-dismiss="modal">&times;</button>
+                                <h5 class="modal-title">添加收货地址</h5>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-group">
+                                    <label class="col-xs-3 control-label item-required">收货人:</label>
+                                    <div class="col-xs-8">
+                                        <input name="consignee" class="form-control" type="text" maxlength="200">
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="col-xs-3 control-label item-required">地区:</label>
+                                    <div class="col-xs-8">
+                                        <input placeholder="省、市、区" name="province" class="form-control" maxlength="200"  type="text">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="col-xs-3 control-label item-required">地址:</label>
+                                    <div class="col-xs-8">
+                                        <input name="address" class="form-control" type="text" maxlength="200">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="col-xs-3 control-label item-required">邮编:</label>
+                                    <div class="col-xs-8">
+                                        <input name="zipCode" class="form-control" type="text" maxlength="200">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="col-xs-3 control-label item-required">电话:</label>
+                                    <div class="col-xs-8">
+                                        <input name="phone" class="form-control" type="text" maxlength="200">
+                                    </div>
+                                </div>
+
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-primary" type="submit" >确 定</button>
+                                <button class="btn btn-default" type="button" data-dismiss="modal">取 消</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+                <input name="skuId" type="hidden" value="159">
+                <input name="groupBuyingId" type="hidden" value="">
+                <input name="quantity" type="hidden" value="1">
+                <input id="receiverId" name="receiverId" type="hidden" value="11960">
+                <input id="paymentMethodId" name="paymentMethodId" type="hidden">
+                <input id="shippingMethodId" name="shippingMethodId" type="hidden">
+                <div id="receiver" class="receiver panel panel-default">
+                    <div class="panel-heading">
+                        <h5>收货地址</h5>
+                    </div>
+                    <div class="panel-body">
+                        <a class="add-receiver" href="#addReceiverModal" data-toggle="modal">
+								<i class="iconfont icon-add"></i>
+								添加收货地址
+                            </a>
+
+                     <ul class="receiver-list">
+       
+                        </ul>
+                    </div>
+                    <div class="panel-footer hidden-element">
+                        <a class="expand-receiver" href="javascript:;">
+								<i class="iconfont icon-unfold"></i>
+								更多收货地址
+							</a>
+                    </div>
+                </div>
+                <div id="paymentMethod" class="payment-method panel panel-default">
+                    <div class="panel-heading">
+                        <h5>支付方式</h5>
+                    </div>
+                    <div class="panel-body">
+                        <ul class="payment-method-list">
+                            <li data-payment-method-id="1" class="active">
+                                网上支付
+                            </li>
+                            <li data-payment-method-id="2">
+                                货到付款
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div id="shippingMethod" class="shipping-method panel panel-default">
+                    <div class="panel-heading">
+                        <h5>配送方式</h5>
+                    </div>
+                    <div class="panel-body">
+                        <ul class="shipping-method-list">
+                            <li data-shipping-method-id="1" >
+                                普通快递
+                            </li>
+                            <li data-shipping-method-id="2" class="active">
+                                顺丰快递
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="panel panel-default">
+                    <div class="panel-body">
+                        <div id="invoiceWrapper">
+           
+                </div>
+                <div id="buyProduct"></div>
+        </div>
+    </main>
+    <footer class="main-footer">
+<div class="container">
+<div class="promise">
+<div class="row">
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-roundcheck"></i>
+</div>
+<div class="pull-left">
+<strong>品质保障</strong>
+<p>品质护航 购物无忧</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-time"></i>
+</div>
+<div class="pull-left">
+<strong>极速物流</strong>
+<p>多仓直发 极速配送</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-like"></i>
+</div>
+<div class="pull-left">
+<strong>售后无忧</strong>
+<p>退换无忧 维修无忧</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-goodsfavor"></i>
+</div>
+<div class="pull-left">
+<strong>天天低价</strong>
+<p>天天低价 帮您省钱</p>
+</div>
+</div>
+</div>
+</div>
+<div class="row">
+<div class="col-xs-4">
+<ul class="contact">
+<li>
+<i class="iconfont icon-phone"></i>
+<strong>020-89855351 </strong>
+</li>
+
+<li>
+<i class="iconfont icon-location"></i>
+广东省广州市黄埔区大沙地东319号保利中誉广场2607室
+</li>
+</ul>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>购物指南</dt>
+<dd>
+<a href="../../article/detail/16_1.html" >免费注册</a>
+</dd>
+<dd>
+<a href="../../article/detail/15_1.html" >购物流程</a>
+</dd>
+<dd>
+<a href="../../article/detail/17_1.html" >会员等级</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>支付方式</dt>
+<dd>
+<a href="../../article/detail/19_1.html" >货到付款</a>
+</dd>
+<dd>
+<a href="../../article/detail/20_1.html" >网银支付</a>
+</dd>
+<dd>
+<a href="../../article/detail/21_1.html" >银行转帐</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>售后服务</dt>
+<dd>
+<a href="../../article/detail/31_1.html" >退换货政策</a>
+</dd>
+<dd>
+<a href="../../article/detail/33_1.html" >退换货申请</a>
+</dd>
+<dd>
+<a href="../../article/detail/34_1.html" >退款说明</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>商家服务</dt>
+<dd>
+<a href="../../article/detail/36_1.html" >商家入驻</a>
+</dd>
+<dd>
+<a href="../../article/detail/37_1.html" >商家帮助</a>
+</dd>
+<dd>
+<a href="../../article/detail/38_1.html" >运营服务</a>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+<div class="bottom-nav">
+<ul class="clearfix">
+<li>
+<a href="/article/detail/39_1.html" >隐私政策</a>
+|
+</li>
+<li>
+<a href="/article/detail/39_1.html" >法律声明</a>
+|
+</li>
+<li>
+<a href="/article/detail/37_1.html" >客户服务</a>
+</li>
+</ul>
+<p><a href="http://www.beian.miit.gov.cn/" class="colorD" target="_blank">Copyright©2020. 广州众咖信息科技服务有限公司 All Rights Reserved 粤ICP备18042113号-2</a></p>
+</div>
+</footer>
+</body>
+</html>
+

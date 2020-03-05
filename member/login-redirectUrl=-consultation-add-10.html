@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="聚点商城 Team">
+<meta name="copyright" content="聚点商城">
+<title>会员登录 - 聚点商城</title>
+<link href="/favicon.ico" rel="icon">
+<link href="/resources/common/css/bootstrap.css"  rel="stylesheet">
+<link href="/resources/common/css/font-awesome.css"  rel="stylesheet">
+<link href="/resources/common/css/iconfont.css"  rel="stylesheet">
+<link href="/resources/common/css/awesome-bootstrap-checkbox.css"  rel="stylesheet">
+<link href="/resources/common/css/base.css"  rel="stylesheet">
+<link href="/resources/shop/css/base.css"  rel="stylesheet">
+<link href="/resources/member/css/login.css"  rel="stylesheet">
+<link href="/resources/common/css/new/backup.css"  rel="stylesheet">
+<script src="/resources/common/js/new/jquery.min.js"></script>
+<script src="/resources/common/js/new/bootstrap.min.js"></script></script>
+<script src="/resources/common/js/new/jquery.bootstrap-growl.min.js"></script>
+<script src="/resources/common/js/jquery.validate.js" ></script>
+<script src="/resources/common/js/jquery.validate.additional.js" ></script>
+<script src="/resources/common/js/new/jquery.form.min.js"></script>
+<script src="/resources/common/js/jquery.cookie.js" ></script>
+<script src="/resources/common/js/new/lodash.min.js"></script>
+<script src="/resources/common/js/new/URI.min.js"></script>
+<script src="/resources/common/js/new/velocity.min.js"></script>
+<script src="/resources/common/js/new/velocity.ui.min.js"></script>
+<script src="/resources/common/js/base.js" ></script>
+<script src="/resources/member/js/base.js" ></script>
+<script>
+				$().ready(function() {
+
+					var $document = $(document);
+					var $loginForm = $("#loginForm");
+					var $username = $("#username");
+					var $password = $("#password");
+					var $captcha = $("#captcha");
+					var $captchaImage = $("[data-toggle='captchaImage']");
+					var $rememberUsername = $("#rememberUsername");
+					var $loginPlugin = $("#loginPlugin a");
+					var rememberedUsernameLocalStorageKey = "rememberedMemberUsername";
+					var loginSuccessUrl = "\/";
+
+					// 记住用户名
+					if (localStorage.getItem(rememberedUsernameLocalStorageKey) != null) {
+						$username.val(localStorage.getItem(rememberedUsernameLocalStorageKey));
+						$password.focus();
+						$rememberUsername.prop("checked", true);
+					} else {
+						$username.focus();
+						$rememberUsername.prop("checked", false);
+					}
+
+					// 表单验证
+					$loginForm.validate({
+						rules: {
+							username: "required",
+							password: {
+								required: true,
+								normalizer: function(value) {
+									return value;
+								}
+							},
+							captcha: "required"
+						},
+						messages: {
+							username: {
+								required: "请填写用户名"
+							},
+							password: {
+								required: "请填写密码"
+							},
+							captcha: {
+								required: "请填写验证码"
+							}
+						},
+						submitHandler: function(form) {
+							$(form).ajaxSubmit({
+								successMessage: false,
+								successRedirectUrl: function(redirectUrlParameterName) {
+									var redirectUrl = new URI().search(true)[redirectUrlParameterName];
+
+									return $.trim(redirectUrl) !== "" ? redirectUrl : loginSuccessUrl;
+								}
+							});
+						},
+						invalidHandler: function(event, validator) {
+							$.bootstrapGrowl(validator.errorList[0].message, {
+								type: "warning"
+							});
+						},
+						errorPlacement: $.noop
+					});
+
+					// 用户登录成功、记住用户名
+					$loginForm.on("success.shopxx.ajaxSubmit", function() {
+						$document.trigger("login-redirectUrl=-member-loggedIn.shopxx.user.html", [{
+							type: "member",
+							username: $username.val()
+						}]);
+
+						if ($rememberUsername.prop("checked")) {
+							localStorage.setItem(rememberedUsernameLocalStorageKey, $username.val());
+						} else {
+							localStorage.removeItem(rememberedUsernameLocalStorageKey);
+						}
+					});
+
+					// 验证码图片
+					$loginForm.on("error.shopxx.ajaxSubmit", function() {
+						$captchaImage.captchaImage("refresh");
+					});
+
+					// 验证码图片
+					$captchaImage.on("refreshed.shopxx.captchaImage", function() {
+						$captcha.val("");
+					});
+
+					// 登录插件
+					$loginPlugin.click(function() {
+						var loginPluginId = $(this).data("login-plugin-id");
+						var redirectUrl = new URI().search(true).redirectUrl;
+
+						location.href = URI("/social_user_login").setSearch({loginPluginId: loginPluginId, redirectUrl: redirectUrl}).toString();
+						return false;
+					});
+
+				});
+			</script>
+</head>
+<body class="login">
+<script id="mainHeaderMemberInfoTemplate" type="text/template">
+	<%if (localStorage.getItem('username') != ''&&localStorage.getItem('username') != null) {%>
+		<ul class="list-inline">
+			<li>
+				<a><%-localStorage.getItem('username')%></a>
+			</li>
+			<li>
+				<a class="logout" href="/index.html">退出</a>
+			</li>
+		</ul>
+	<%} else {%>
+		<ul class="list-inline">
+			<li>
+				<a href="/member/login.html">登录</a>
+			</li>
+			<li>
+				<a href="/member/register.html">注册</a>
+			</li>
+		</ul>
+	<%}%>
+</script>
+<script id="mainHeaderCartDetailTemplate" type="text/template">
+	<%if (!_.isEmpty(cart.cartItems)) {%>
+		<div class="cart-detail-body">
+			<ul>
+				<%_.each(cart.cartItems, function(cartItem, i) {%>
+					<li>
+						<a href="<%-cartItem.skuPath%>">
+							<img src="<%-cartItem.skuThumbnail%>" alt="<%-cartItem.skuName%>">
+							<span class="text-overflow" title="<%-cartItem.skuName%>"><%-cartItem.skuName%></span>
+						</a>
+						<span>
+							<strong><%-$.currency(cartItem.price, true, false)%></strong>
+							&times; <%-cartItem.quantity%>
+						</span>
+					</li>
+				<%});%>
+			</ul>
+		</div>
+		<div class="cart-detail-footer">
+			共计:
+			<strong><%-$.currency(cart.effectivePrice, true, true)%></strong>
+			<a class="pull-right" href="../cart/list.html">商品结算</a>
+		</div>
+	<%} else {%>
+		<p>您的购物车是空的，请去挑选您的商品！</p>
+	<%}%>
+</script>
+<script>
+		$().ready(function() {
+			
+			var $document = $(document);
+			var $mainHeaderTopAd = $("#mainHeaderTopAd");
+			var $mainHeaderTopAdClose = $("#mainHeaderTopAd button.close");
+			var $mainHeaderMemberInfo = $("#mainHeaderMemberInfo");
+			var $mainHeaderProductSearchForm = $("#mainHeaderProductSearch form");
+			var $searchType = $("#mainHeaderProductSearch [data-search-type]");
+			var $mainHeaderProductSearchKeyword = $("#mainHeaderProductSearch input[name='keyword']");
+			var $mainHeaderCart = $("#mainHeaderCart");
+			var $mainHeaderCartQuantity = $("#mainHeaderCart em");
+			var $mainHeaderCartDetail = $("#mainHeaderCart div.cart-detail");
+			var $mainHeaderMainNavInkBar = $("#mainHeaderMainNav div.ink-bar");
+			var $mainHeaderMainNavItem = $("#mainHeaderMainNav li");
+			var $mainHeaderMainNavActiveItem = $("#mainHeaderMainNav li.active");
+			var mainHeaderMemberInfoTemplate = _.template($("#mainHeaderMemberInfoTemplate").html());
+			var mainHeaderCartDetailTemplate = _.template($("#mainHeaderCartDetailTemplate").html());
+			
+			// 顶部广告
+			if (sessionStorage.getItem("mainHeaderTopAdHidden") == null) {
+				$mainHeaderTopAd.show();
+			}
+			
+			// 顶部广告
+			$mainHeaderTopAdClose.click(function() {
+				sessionStorage.setItem("mainHeaderTopAdHidden", "true");
+				$mainHeaderTopAd.velocity("slideUp");
+			});
+			
+			// 会员信息
+			$mainHeaderMemberInfo.html(mainHeaderMemberInfoTemplate({
+				currentUser: $.getCurrentUser()
+			}));
+			
+			// 用户注销
+			$mainHeaderMemberInfo.on("click", "a.logout", function() {
+				localStorage.setItem('username','')
+				localStorage.setItem('authority','')
+				localStorage.setItem('token','')
+				let cartDatas = JSON.parse(localStorage.getItem('cartDatas'))
+				cartDatas.cartItems = []
+				localStorage.setItem('cartDatas',JSON.stringify(cartDatas))
+			});
+			
+			// 搜索类型
+			$searchType.click(function() {
+				var $element = $(this);
+				var searchType = $element.data("search-type");
+				
+				$element.closest("div.input-group").find("[data-toggle='dropdown'] span:not(.caret)").text($element.text());
+				
+				switch (searchType) {
+					case "product":
+						$mainHeaderProductSearchForm.attr("action", "/product/search.html");
+						break;
+					case "store":
+						$mainHeaderProductSearchForm.attr("action", "/store/search.html");
+						break;
+				}
+			});
+			
+			// 商品搜索
+			$mainHeaderProductSearchForm.submit(function() {
+				if ($.trim($mainHeaderProductSearchKeyword.val()) === "") {
+					return false;
+				}
+			});
+			
+			// 购物车
+				// 购物车
+			$mainHeaderCart.hover(function() {
+				var loading = true;
+				
+				setTimeout(function() {
+					if (loading) {
+						$mainHeaderCartDetail.html('<div class="cart-loader"><span></span><span></span><span></span><span></span><span></span></div>');
+					}
+				}, 500);
+				let data = $.getCurrentCart()
+				
+					loading = false;
+					$mainHeaderCartDetail.html(mainHeaderCartDetailTemplate({
+						cart: data
+					}));
+			
+			});
+			
+			// 购物车数量
+			var currentCartQuantity = $.getCurrentCartQuantity();
+			if (currentCartQuantity != null) {
+				$mainHeaderCartQuantity.text(currentCartQuantity < 100 ? currentCartQuantity : "99+");
+			}
+			
+			// 购物车数量
+			$document.on("complete.shopxx.setCurrentCartQuantity", function(event, quantity) {
+				$mainHeaderCartQuantity.text(quantity < 100 ? quantity : "99+");
+			});
+			
+			// 主导航
+			if ($mainHeaderMainNavItem.length > 0) {
+				if ($mainHeaderMainNavActiveItem.length < 1) {
+					$mainHeaderMainNavActiveItem = $mainHeaderMainNavItem.first();
+				}
+				
+				$mainHeaderMainNavInkBar.css({
+					width: $mainHeaderMainNavActiveItem.outerWidth(),
+					display: "block",
+					left: $mainHeaderMainNavActiveItem.position().left
+				});
+				
+				$mainHeaderMainNavItem.hover(function() {
+					var $element = $(this);
+					
+					$mainHeaderMainNavInkBar.css({
+						width: $element.outerWidth(),
+						left: $element.position().left
+					});
+				}, function() {
+					$mainHeaderMainNavInkBar.css({
+						width: $mainHeaderMainNavActiveItem.outerWidth(),
+						left: $mainHeaderMainNavActiveItem.position().left
+					});
+				});
+			}
+			
+		});
+		</script>
+<header class="main-header">
+<div id="mainHeaderTopAd" class="top-ad">
+<button class="close" type="button">
+<span>&times;</span>
+</button>
+<a href="../index.html"  target="blank">
+<img src="/images/cc976454-1494-43de-96a8-fda391c880a9.jpg"  alt="空调0元安装放心购">
+</a>
+</div>
+<div class="top-nav">
+<div class="container">
+<div class="row">
+<div class="col-xs-12">
+<div id="mainHeaderMemberInfo" class="pull-left"></div>
+<ul class="list-inline pull-right">
+<li>
+<a href="/member/login.html">会员中心</a>
+</li>
+<li>
+<a href="/member/order/list.html" >我的订单</a>
+</li>
+<li class="top-nav-dropdown">
+<a href="javascript:;">
+商家服务
+<span class="caret"></span>
+</a>
+<ul class="business">
+<li>
+<a href="../business/login-redirectUrl=-business-index.html"  target="_blank" rel="noopener noreferrer">商家中心</a>
+</li>
+<li>
+<a href="../business/register.html" >商家入驻</a>
+</li>
+</ul>
+</li>
+
+
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="container">
+<div class="row">
+<div class="col-xs-3 logo-container" >
+    <a>
+        <img  class="logo-img" src="/images/logo.png"  alt="聚点商城">
+        <div class="logo-text" >
+            <h3>聚点商城</h3>
+        </div>
+    </a>
+</div>
+<div class="col-xs-6">
+<p class="empty-header-center-block"></p>
+</div>
+<div class="col-xs-3">
+
+</div>
+</div>
+<div class="row">
+<div class="col-xs-2">
+<a class="product-category" href="../product_category.html" >
+<i class="iconfont icon-sort"></i>
+所有商品分类
+</a>
+</div>
+<div class="col-xs-10">
+<div id="mainHeaderMainNav" class="main-nav">
+<div class="ink-bar"></div>
+<ul>
+<li>
+<a href="../index.html" >首页</a>
+</li>
+<li>
+<a href="../product/list/1.html" >手机数码</a>
+</li>
+<li>
+<a href="../product/list/2.html" >办公家电</a>
+</li>
+<li>
+<a href="../product/list/3.html" >精品服饰</a>
+</li>
+<li>
+<a href="../product/list/4.html" >珠宝饰品</a>
+</li>
+<li>
+<a href="../product/list/5.html" >美妆护肤</a>
+</li>
+
+<li>
+<a href="../product/list-type=EXCHANGE.html" >积分商城</a>
+</li>
+<li>
+<a href="../product/list-promotionPluginId=groupBuyingPromotionPlugin.html" >团购商城</a>
+</li>
+<li>
+<a href="../article/list/1.html" >商城动态</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</header><main>
+<div class="container">
+<div class="row">
+<div class="col-xs-8">
+<div class="left-ad">
+<a href="../index.html"  target="blank">
+<img src="/images/5331ae7c-56a1-42eb-81a7-b041cdfb64ba.jpg"  alt="家电十一 满减风暴">
+</a>
+</div>
+</div>
+<div class="col-xs-4">
+<form id="loginForm" action="/member/login" method="post">
+<input name="socialUserId" type="hidden" value="">
+<input name="uniqueId" type="hidden" value="">
+<div class="panel panel-default">
+<div class="panel-heading">
+<div class="panel-title">
+<h1 class="text-red">
+会员登录
+<small>USER LOGIN</small>
+</h1>
+</div>
+</div>
+<div class="panel-body">
+<div class="form-group">
+<div class="input-group">
+<span class="input-group-addon">
+<i class="iconfont icon-people"></i>
+</span>
+<input id="username" name="username" class="form-control" type="text" maxlength="200" placeholder="用户名/E-mail/手机" autocomplete="off">
+</div>
+</div>
+<div class="form-group">
+<div class="input-group">
+<span class="input-group-addon">
+<i class="iconfont icon-lock"></i>
+</span>
+<input id="password" name="password" class="form-control" type="password" maxlength="200" placeholder="密 码" autocomplete="off">
+</div>
+</div>
+<div class="form-group">
+<div class="input-group">
+<span class="input-group-addon">
+<i class="iconfont icon-pic"></i>
+</span>
+<input id="captcha" name="captcha" class="captcha form-control" type="text" maxlength="4" placeholder="验证码" autocomplete="off">
+<div class="input-group-btn">
+<img class="captcha-image" src="../resources/common/images/transparent.png"  title="点击更换验证码" data-toggle="captchaImage">
+</div>
+</div>
+</div>
+<div class="form-group">
+<div class="checkbox">
+<input id="rememberUsername" name="rememberUsername" type="checkbox" value="true">
+<label for="rememberUsername">记住用户名</label>
+</div>
+</div>
+<div class="form-group">
+<button class="btn btn-primary btn-lg btn-block" type="submit">
+登 录
+</button>
+</div>
+<div class="row">
+<div class="col-xs-6 text-left">
+<a class="text-orange" href="register.html" >立即注册</a>
+</div>
+<div class="col-xs-6 text-right">
+<a href="../password/forgot-type=MEMBER.html" >忘记密码</a>
+</div>
+</div>
+</div>
+<div class="panel-footer">
+<ul id="loginPlugin" class="clearfix">
+<li>
+<a href="javascript:;" data-login-plugin-id="alipayLoginPlugin">
+<img src="/images/4503ac1f-09e3-4fcb-82ff-a3a8392428a3.png"  alt="支付宝登录">
+</a>
+</li>
+<li>
+<a href="javascript:;" data-login-plugin-id="weixinNativeLoginPlugin">
+<img src="/images/2aaee230-c6d1-4aac-9fde-e27e36559d1b.png"  alt="微信登录">
+</a>
+</li>
+</ul>
+</div>
+</div>
+</form>
+</div>
+</div>
+</div>
+</main>
+<footer class="main-footer">
+<div class="container">
+<div class="promise">
+<div class="row">
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-roundcheck"></i>
+</div>
+<div class="pull-left">
+<strong>品质保障</strong>
+<p>品质护航 购物无忧</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-time"></i>
+</div>
+<div class="pull-left">
+<strong>极速物流</strong>
+<p>多仓直发 极速配送</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-like"></i>
+</div>
+<div class="pull-left">
+<strong>售后无忧</strong>
+<p>退换无忧 维修无忧</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-goodsfavor"></i>
+</div>
+<div class="pull-left">
+<strong>天天低价</strong>
+<p>天天低价 帮您省钱</p>
+</div>
+</div>
+</div>
+</div>
+<div class="row">
+<div class="col-xs-4">
+<ul class="contact">
+<li>
+<i class="iconfont icon-phone"></i>
+<strong>020-89855351 </strong>
+</li>
+
+<li>
+<i class="iconfont icon-location"></i>
+广东省广州市黄埔区大沙地东319号保利中誉广场2607室
+</li>
+</ul>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>购物指南</dt>
+<dd>
+<a href="../article/detail/16_1.html" >免费注册</a>
+</dd>
+<dd>
+<a href="../article/detail/15_1.html" >购物流程</a>
+</dd>
+<dd>
+<a href="../article/detail/17_1.html" >会员等级</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>支付方式</dt>
+<dd>
+<a href="../article/detail/19_1.html" >货到付款</a>
+</dd>
+<dd>
+<a href="../article/detail/20_1.html" >网银支付</a>
+</dd>
+<dd>
+<a href="../article/detail/21_1.html" >银行转帐</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>售后服务</dt>
+<dd>
+<a href="../article/detail/31_1.html" >退换货政策</a>
+</dd>
+<dd>
+<a href="../article/detail/33_1.html" >退换货申请</a>
+</dd>
+<dd>
+<a href="../article/detail/34_1.html" >退款说明</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>商家服务</dt>
+<dd>
+<a href="../article/detail/36_1.html" >商家入驻</a>
+</dd>
+<dd>
+<a href="../article/detail/37_1.html" >商家帮助</a>
+</dd>
+<dd>
+<a href="../article/detail/38_1.html" >运营服务</a>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+<div class="bottom-nav">
+<ul class="clearfix">
+<li>
+<a href="/article/detail/39_1.html" >隐私政策</a>
+|
+</li>
+<li>
+<a href="/article/detail/39_1.html" >法律声明</a>
+|
+</li>
+<li>
+<a href="/article/detail/37_1.html" >客户服务</a>
+
+</li>
+
+</ul>
+<p><a href="http://www.beian.miit.gov.cn/" class="colorD" target="_blank" rel="noopener noreferrer">Copyright©2020. 广州众咖信息科技服务有限公司 All Rights Reserved 粤ICP备18042113号-2</a></p>
+</div>
+</footer></body>
+</html>
