@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="聚点商城 Team">
+<meta name="copyright" content="聚点商城">
+<meta name="keywords" content="国务院力挺工业互联网 互联网+成新引擎">
+<meta name="description" content="国务院力挺工业互联网 互联网+成新引擎">
+<title>国务院力挺工业互联网 互联网+成新引擎 - 聚点商城</title>
+<link href="/favicon.ico" rel="icon">
+<link href="/resources/common/css/bootstrap.css"  rel="stylesheet">
+<link href="/resources/common/css/font-awesome.css"  rel="stylesheet">
+<link href="/resources/common/css/iconfont.css"  rel="stylesheet">
+<link href="/resources/common/css/base.css"  rel="stylesheet">
+<link href="/resources/shop/css/base.css"  rel="stylesheet">
+<link href="/resources/shop/css/article.css"  rel="stylesheet">
+<link href="/resources/common/css/new/backup.css"  rel="stylesheet">
+
+<script src="/resources/common/js/new/jquery.min.js"></script>
+<script src="/resources/common/js/new/bootstrap.min.js"></script></script>
+<script src="/resources/common/js/new/jquery.bootstrap-growl.min.js"></script>
+<script src="/resources/common/js/jquery.cookie.js" ></script>
+<script src="/resources/common/js/jquery.qrcode.js" ></script>
+<script src="/resources/common/js/lodash.js" ></script>
+<script src="/resources/common/js/new/URI.min.js"></script>
+<script src="/resources/common/js/new/velocity.min.js"></script>
+<script src="/resources/common/js/new/velocity.ui.min.js"></script>
+<script src="/resources/common/js/base.js" ></script>
+<script src="/resources/shop/js/base.js" ></script>
+<script>
+			$().ready(function() {
+
+				var $hits = $("#hits");
+
+				// 点击数
+				$.get("/article/hits/2").done(function(data) {
+					$hits.text(data.hits);
+				});
+
+			});
+			</script>
+</head>
+<body class="shop article-detail">
+<script id="mainHeaderMemberInfoTemplate" type="text/template">
+	<%if (localStorage.getItem('username') != ''&&localStorage.getItem('username') != null) {%>
+		<ul class="list-inline">
+			<li>
+				<a><%-localStorage.getItem('username')%></a>
+			</li>
+			<li>
+				<a class="logout" href="/index.html">退出</a>
+			</li>
+		</ul>
+	<%} else {%>
+		<ul class="list-inline">
+			<li>
+				<a href="/member/login.html">登录</a>
+			</li>
+			<li>
+				<a href="/member/register.html">注册</a>
+			</li>
+		</ul>
+	<%}%>
+</script>
+<script id="mainHeaderCartDetailTemplate" type="text/template">
+	<%if (!_.isEmpty(cart.cartItems)) {%>
+		<div class="cart-detail-body">
+			<ul>
+				<%_.each(cart.cartItems, function(cartItem, i) {%>
+					<li>
+						<a href="<%-cartItem.skuPath%>">
+							<img src="<%-cartItem.skuThumbnail%>" alt="<%-cartItem.skuName%>">
+							<span class="text-overflow" title="<%-cartItem.skuName%>"><%-cartItem.skuName%></span>
+						</a>
+						<span>
+							<strong><%-$.currency(cartItem.price, true, false)%></strong>
+							&times; <%-cartItem.quantity%>
+						</span>
+					</li>
+				<%});%>
+			</ul>
+		</div>
+		<div class="cart-detail-footer">
+			共计:
+			<strong><%-$.currency(cart.effectivePrice, true, true)%></strong>
+			<a class="pull-right" href="../../cart/list.html">商品结算</a>
+		</div>
+	<%} else {%>
+		<p>您的购物车是空的，请去挑选您的商品！</p>
+	<%}%>
+</script>
+<script>
+		$().ready(function() {
+
+			var $document = $(document);
+			var $mainHeaderTopAd = $("#mainHeaderTopAd");
+			var $mainHeaderTopAdClose = $("#mainHeaderTopAd button.close");
+			var $mainHeaderMemberInfo = $("#mainHeaderMemberInfo");
+			var $mainHeaderProductSearchForm = $("#mainHeaderProductSearch form");
+			var $searchType = $("#mainHeaderProductSearch [data-search-type]");
+			var $mainHeaderProductSearchKeyword = $("#mainHeaderProductSearch input[name='keyword']");
+			var $mainHeaderCart = $("#mainHeaderCart");
+			var $mainHeaderCartQuantity = $("#mainHeaderCart em");
+			var $mainHeaderCartDetail = $("#mainHeaderCart div.cart-detail");
+			var $mainHeaderMainNavInkBar = $("#mainHeaderMainNav div.ink-bar");
+			var $mainHeaderMainNavItem = $("#mainHeaderMainNav li");
+			var $mainHeaderMainNavActiveItem = $("#mainHeaderMainNav li.active");
+			var mainHeaderMemberInfoTemplate = _.template($("#mainHeaderMemberInfoTemplate").html());
+			var mainHeaderCartDetailTemplate = _.template($("#mainHeaderCartDetailTemplate").html());
+
+			// 顶部广告
+			if (sessionStorage.getItem("mainHeaderTopAdHidden") == null) {
+				$mainHeaderTopAd.show();
+			}
+
+			// 顶部广告
+			$mainHeaderTopAdClose.click(function() {
+				sessionStorage.setItem("mainHeaderTopAdHidden", "true");
+				$mainHeaderTopAd.velocity("slideUp");
+			});
+
+			// 会员信息
+			$mainHeaderMemberInfo.html(mainHeaderMemberInfoTemplate({
+				currentUser: $.getCurrentUser()
+			}));
+
+			// 用户注销
+			$mainHeaderMemberInfo.on("click", "a.logout", function() {
+				localStorage.setItem('username','')
+				localStorage.setItem('authority','')
+				localStorage.setItem('token','')
+				let cartDatas = JSON.parse(localStorage.getItem('cartDatas'))
+				cartDatas.cartItems = []
+				localStorage.setItem('cartDatas',JSON.stringify(cartDatas))
+				window.location.href=document.referrer;
+                $document.trigger("loggedOut.shopxx.user", $.getCurrentUser());
+			});
+
+			// 搜索类型
+			$searchType.click(function() {
+				var $element = $(this);
+				var searchType = $element.data("search-type");
+
+				$element.closest("div.input-group").find("[data-toggle='dropdown'] span:not(.caret)").text($element.text());
+
+				switch (searchType) {
+					case "product":
+						$mainHeaderProductSearchForm.attr("action", "/product/search.html");
+						break;
+					case "store":
+						$mainHeaderProductSearchForm.attr("action", "/store/search.html");
+						break;
+				}
+			});
+
+			// 商品搜索
+			$mainHeaderProductSearchForm.submit(function() {
+				if ($.trim($mainHeaderProductSearchKeyword.val()) === "") {
+					return false;
+				}
+			});
+
+			// 购物车
+				// 购物车
+			$mainHeaderCart.hover(function() {
+				var loading = true;
+
+				setTimeout(function() {
+					if (loading) {
+						$mainHeaderCartDetail.html('<div class="cart-loader"><span></span><span></span><span></span><span></span><span></span></div>');
+					}
+				}, 500);
+				let data = $.getCurrentCart()
+
+					loading = false;
+					$mainHeaderCartDetail.html(mainHeaderCartDetailTemplate({
+						cart: data
+					}));
+
+			});
+
+			// 购物车数量
+			var currentCartQuantity = $.getCurrentCartQuantity();
+			if (currentCartQuantity != null) {
+				$mainHeaderCartQuantity.text(currentCartQuantity < 100 ? currentCartQuantity : "99+");
+			}
+
+			// 购物车数量
+			$document.on("complete.shopxx.setCurrentCartQuantity", function(event, quantity) {
+				$mainHeaderCartQuantity.text(quantity < 100 ? quantity : "99+");
+			});
+
+			// 主导航
+			if ($mainHeaderMainNavItem.length > 0) {
+				if ($mainHeaderMainNavActiveItem.length < 1) {
+					$mainHeaderMainNavActiveItem = $mainHeaderMainNavItem.first();
+				}
+
+				$mainHeaderMainNavInkBar.css({
+					width: $mainHeaderMainNavActiveItem.outerWidth(),
+					display: "block",
+					left: $mainHeaderMainNavActiveItem.position().left
+				});
+
+				$mainHeaderMainNavItem.hover(function() {
+					var $element = $(this);
+
+					$mainHeaderMainNavInkBar.css({
+						width: $element.outerWidth(),
+						left: $element.position().left
+					});
+				}, function() {
+					$mainHeaderMainNavInkBar.css({
+						width: $mainHeaderMainNavActiveItem.outerWidth(),
+						left: $mainHeaderMainNavActiveItem.position().left
+					});
+				});
+			}
+
+		});
+		</script>
+<header class="main-header">
+<div id="mainHeaderTopAd" class="top-ad">
+<button class="close" type="button">
+<span>&times;</span>
+</button>
+<a href="/product/detail/51.html"  target="blank">
+<img src="/images/cc976454-1494-43de-96a8-fda391c880a9.jpg"  alt="空调0元安装放心购">
+</a>
+</div>
+<div class="top-nav">
+<div class="container">
+<div class="row">
+<div class="col-xs-12">
+<div id="mainHeaderMemberInfo" class="pull-left"></div>
+<ul class="list-inline pull-right">
+<li>
+<a href="/member/login.html" >会员中心</a>
+</li>
+<li>
+<a href="../../member/order/list.html" >我的订单</a>
+</li>
+<li class="top-nav-dropdown">
+<a href="javascript:;">
+商家服务
+<span class="caret"></span>
+</a>
+<ul class="business">
+<li>
+<a href="../../business/login-redirectUrl=-business-index.html"  target="_blank" rel="noopener noreferrer">商家中心</a>
+</li>
+<li>
+<a href="../../business/register.html" >商家入驻</a>
+</li>
+</ul>
+</li>
+
+
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="container">
+<div class="row">
+<div class="col-xs-3 logo-container" >
+    <a>
+        <img  class="logo-img" src="/images/logo.png"  alt="聚点商城">
+        <div class="logo-text" >
+            <h3>聚点商城</h3>
+        </div>
+    </a>
+</div>
+<div class="col-xs-6">
+<p class="empty-header-center-block"></p>
+</div>
+<div class="col-xs-3">
+
+</div>
+</div>
+<div class="row">
+<div class="col-xs-2">
+<a class="product-category" href="../../product_category.html" >
+<i class="iconfont icon-sort"></i>
+所有商品分类
+</a>
+</div>
+<div class="col-xs-10">
+<div id="mainHeaderMainNav" class="main-nav">
+<div class="ink-bar"></div>
+<ul>
+<li>
+<a href="../../index.html" >首页</a>
+</li>
+<li>
+<a href="../../product/list/1.html" >手机数码</a>
+</li>
+<li>
+<a href="../../product/list/2.html" >办公家电</a>
+</li>
+<li>
+<a href="../../product/list/3.html" >精品服饰</a>
+</li>
+<li>
+<a href="../../product/list/4.html" >珠宝饰品</a>
+</li>
+<li>
+<a href="../../product/list/5.html" >美妆护肤</a>
+</li>
+
+<li>
+<a href="../../product/list-type=EXCHANGE.html" >积分商城</a>
+</li>
+<li>
+<a href="../../product/list-promotionPluginId=groupBuyingPromotionPlugin.html" >团购商城</a>
+</li>
+<li>
+<a href="../list/1.html" >商城动态</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</header><script id="historyProductTemplate" type="text/template">
+	<h4>
+		浏览记录
+		<%if (!_.isEmpty(data)) {%>
+			<a class="clear pull-right" href="javascript:;">清空</a>
+		<%}%>
+	</h4>
+	<%if (!_.isEmpty(data)) {%>
+		<ul class="clearfix">
+			<%_.each(data, function(product, i) {%>
+				<li>
+					<a href="<%-product.path%>" target="_blank" rel="noopener noreferrer">
+						<img class="img-responsive center-block" src="<%-product.thumbnail != null ? product.thumbnail : "/images/default_thumbnail_product_image.png"%>" alt="<%-product.name%>">
+						<h5 class="text-overflow" title="<%-product.name%>"><%-product.name%></h5>
+					</a>
+				</li>
+			<%});%>
+		</ul>
+	<%} else {%>
+		<p>暂无信息</p>
+	<%}%>
+</script>
+<script>
+			$().ready(function() {
+
+				var $window = $(window);
+				var $document = $(document);
+				var $body = $("body");
+				var $mainSidebar = $("#mainSidebar");
+				var $mainSidebarCartQuantity = $("#mainSidebarCart em");
+				var $mainSidebarTooltipToggle = $("#mainSidebar [data-toggle='tooltip']");
+				var $historyProductCollapse = $("#historyProductCollapse");
+				var $mainSidebarQrcodeContent = $("#mainSidebarQrcode div.content");
+				var $mainSidebarBackTop = $("#mainSidebarBackTop");
+				var $mainSidebarHistoryProduct = $("#mainSidebarHistoryProduct");
+				var mainSidebarBackTopHidden = true;
+				var mainSidebarExpanded = false;
+				var historyProductTemplate = _.template($("#historyProductTemplate").html());
+				var historyProductIdsLocalStorageKey = "historyProductIds";
+
+				// 购物车数量
+				var currentCartQuantity = $.getCurrentCartQuantity();
+
+				if (currentCartQuantity != null) {
+					$mainSidebarCartQuantity.text(currentCartQuantity < 100 ? currentCartQuantity : "99+");
+				}
+
+				// 购物车数量
+				$document.on("complete.shopxx.setCurrentCartQuantity", function(event, quantity) {
+					$mainSidebarCartQuantity.text(quantity < 100 ? quantity : "99+");
+				});
+
+				// 提示
+				$mainSidebarTooltipToggle.tooltip();
+
+				// 浏览记录展开/折叠
+					// $document.on("click", function(e) {
+				// 	if ($mainSidebar.data("collapse-disabled") === "true") {
+				// 		return;
+				// 	}
+				// 	if ($historyProductCollapse[0] === e.target || $.contains($historyProductCollapse[0], e.target) || (mainSidebarExpanded && !$.contains($mainSidebar[0], e.target))) {
+				// 		$mainSidebar.velocity({
+				// 			right: mainSidebarExpanded ? -300 : 0
+				// 		}, {
+				// 			begin: function() {
+				// 				$mainSidebar.data("collapse-disabled", "true");
+				// 				if (!mainSidebarExpanded) {
+				// 					loadHistoryProduct();
+				// 				}
+				// 			},
+				// 			complete: function() {
+				// 				$mainSidebar.removeData("collapse-disabled");
+				// 				mainSidebarExpanded = !mainSidebarExpanded;
+				// 			}
+				// 		}, 500);
+				// 	}
+				// });
+
+				// 加载浏览记录
+				function loadHistoryProduct() {
+					var historyProductIdsLocalStorage = localStorage.getItem(historyProductIdsLocalStorageKey);
+					var historyProductIds = historyProductIdsLocalStorage != null ? JSON.parse(historyProductIdsLocalStorage) : [];
+
+					$.get("/product/history", {
+						productIds: historyProductIds
+					}).done(function(data) {
+						localStorage.setItem(historyProductIdsLocalStorageKey, JSON.stringify($.map(data, function(item) {
+							return item.id
+						})));
+						$mainSidebarHistoryProduct.html(historyProductTemplate({
+							data: data
+						}));
+					});
+				}
+
+				// 清空浏览记录
+				$mainSidebarHistoryProduct.on("click", ".clear", function() {
+					localStorage.removeItem(historyProductIdsLocalStorageKey);
+					$mainSidebarHistoryProduct.html(historyProductTemplate({
+						data: {}
+					}));
+					return false;
+				});
+
+				// 二维码
+				$mainSidebarQrcodeContent.qrcode({
+					width: 100,
+					height: 100,
+					text: location.href
+				});
+
+				// 返回顶部
+				$window.scroll(_.throttle(function() {
+					if ($window.scrollTop() > 500) {
+						if (mainSidebarBackTopHidden) {
+							mainSidebarBackTopHidden = false;
+							$mainSidebarBackTop.velocity("fadeIn");
+						}
+					} else {
+						if (!mainSidebarBackTopHidden) {
+							mainSidebarBackTopHidden = true;
+							$mainSidebarBackTop.velocity("fadeOut");
+						}
+					}
+				}, 500));
+
+				// 返回顶部
+				$mainSidebarBackTop.click(function() {
+					$body.velocity("stop").velocity("scroll", {
+						duration: 1000
+					});
+				});
+
+			});
+		</script>
+<aside id="mainSidebar" class="main-sidebar clearfix">
+<div class="main-sidebar-body">
+<ul>
+<li>
+<a id="mainSidebarCart" class="cart" href="../../cart/list.html" >
+<i class="iconfont icon-cart"></i>
+<span>购物车</span>
+<em>0</em>
+</a>
+</li>
+<li>
+<a href="../../member/order/list.html"  title="我的订单" data-toggle="tooltip" data-placement="left">
+<i class="iconfont icon-form"></i>
+</a>
+</li>
+
+<li>
+<a href="/member/product_favorite/list.html"  title="我的收藏" data-toggle="tooltip" data-placement="left">
+<i class="iconfont icon-like"></i>
+</a>
+</li>
+<li>
+<a href="../..//member/coupon_code/list.html"  title="优惠券" data-toggle="tooltip" data-placement="left">
+<i class="iconfont icon-ticket"></i>
+</a>
+</li>
+<li>
+
+</li>
+</ul>
+<a id="mainSidebarBackTop" class="back-top" href="javascript:;" title="返回顶部">
+<i class="iconfont icon-top"></i>
+</a>
+</div>
+<div class="main-sidebar-right">
+<div id="mainSidebarHistoryProduct" class="history-product"></div>
+</div>
+</aside> <main>
+<div class="container">
+<div class="row">
+<div class="col-xs-2">
+<div class="hot-article-category">
+<div class="hot-article-category-heading">
+<h4>热点分类</h4>
+</div>
+<div class="hot-article-category-body">
+<ul>
+<li>
+<a href="../list/1.html" >商城动态</a>
+</li>
+<li>
+<a href="../list/2.html" >促销活动</a>
+</li>
+<li>
+<a href="../list/3.html" >购物指南</a>
+</li>
+<li>
+<a href="../list/4.html" >支付方式</a>
+</li>
+<li>
+<a href="../list/5.html" >配送方式</a>
+</li>
+<li>
+<a href="../list/6.html" >订单服务</a>
+</li>
+<li>
+<a href="../list/7.html" >售后服务</a>
+</li>
+<li>
+<a href="../list/8.html" >商家服务</a>
+</li>
+</ul>
+</div>
+</div>
+<div class="hot-article">
+<div class="hot-article-heading">
+<h4>热点文章</h4>
+</div>
+<div class="hot-article-body">
+<ul>
+<li class="text-overflow">
+<a href="8_1.html"  title="高效配送已成为必需 快递业亟待转型升级">高效配送已成为必需 快递业亟待转型升级</a>
+</li>
+<li class="text-overflow">
+<a href="4_1.html"  title="农村电商加速布局助力乡村振兴">农村电商加速布局助力乡村振兴</a>
+</li>
+<li class="text-overflow">
+<a href="7_1.html"  title="智能化商业布局解决物流难题">智能化商业布局解决物流难题</a>
+</li>
+<li class="text-overflow">
+<a href="1_1.html"  title="2018年电商发展5大趋势预测">2018年电商发展5大趋势预测</a>
+</li>
+<li class="text-overflow">
+<a href="6_1.html"  title="政策助力物流绿色化发展，供应链亟需落实解决方案">政策助力物流绿色化发展，供应链亟需落实解决方案</a>
+</li>
+<li class="text-overflow">
+<a href="5_1.html"  title="双11新消费缘何撬动全球经济">双11新消费缘何撬动全球经济</a>
+</li>
+<li class="text-overflow">
+<a href="3_1.html"  title="电子支付过程中的安全思考">电子支付过程中的安全思考</a>
+</li>
+<li class="text-overflow">
+<a href="2_1.html"  title="国务院力挺工业互联网 互联网+成新引擎">国务院力挺工业互联网 互联网+成新引擎</a>
+</li>
+</ul>
+</div>
+</div>
+<script>
+		$().ready(function() {
+
+			var $articleSearchForm = $("#articleSearchForm");
+			var $keyword = $("#articleSearchForm [name='keyword']");
+
+			// 搜索
+			$articleSearchForm.submit(function() {
+				if ($.trim($keyword.val()) === "") {
+					return false;
+				}
+			});
+
+		});
+		</script>
+<div class="article-search">
+<form id="articleSearchForm" action="/article/search.html" method="get">
+
+</form>
+</div> </div>
+<div class="col-xs-10">
+<ol class="breadcrumb">
+<li>
+<a href="../../index.html" >
+<i class="iconfont icon-homefill"></i>
+首页
+</a>
+</li>
+<li class="active">
+<a href="../list/1.html" >商城动态</a>
+</li>
+</ol>
+<div class="article-content panel panel-default">
+<div class="panel-heading">
+<h4>国务院力挺工业互联网 互联网+成新引擎</h4>
+<span>2018-01-25 00:00:53</span>
+<span>作者: 聚点商城</span>
+<span>
+<i class="iconfont icon-attentionfill"></i>
+<span id="hits"></span>
+</span>
+</div>
+<div class="panel-body">
+<p>国务院正式印发《关于深化“互联网+先进制造业”发展工业互联网的指导意见》，提出增强工业互联网产业供给能力，持续提升我国工业互联网发展水平，深入推进“互联网+”，形成实体经济与网络相互促进、同步提升的良好格局，并提出分2025年、2035年和21世纪中叶“三步走”的目标，到2025年，形成3-5家具有国际竞争力的工业互联网平台，实现百万工业APP培育以及百万企业上云。而该意见的发布将对行业产生什么样的影响？<br><br>工业互联网已成为制造业数字化转型的重要方向，亦成为国际国内制造企业和IT巨头竞相抢滩登陆的新市场。11月27日，国务院正式印发《关于深化“互联网+先进制造业”发展工业互联网的指导意见》(下称《意见》)，明确了国内工业互联网的发展目标、主要任务和支持措施。<br><br>据中国电子商务研究中心从《意见》中获悉，《意见》提出，中国发展工业互联网的整体目标是构建与经济社会发展相适应的工业互联网生态体系，并提出了分阶段实施目标。到2020年要支持建设一批跨行业、跨领域的国家级平台，以及构建一批企业级平台，培育30万个以上的工业APP即工业应用程序，推动30万家企业应用工业互联网平台；到2025年，形成3-5家具有国际竞争力的工业互联网平台，实现百万工业APP培育以及百万企业上云。<br><br>到2035年，建成国际领先的工业互联网网络基础设施和平台，形成国际先进的技术与产业体系；到本世纪中叶，工业互联网网络基础设施全面支撑经济社会发展，工业互联网创新发展能力、技术产业体系以及融合应用等全面达到国际先进水平，综合实力进入世界前列。<br><br>《意见》明确了建设和发展工业互联网的主要任务：一是夯实网络基础；二是打造平台体系；三是加强产业支撑；四是促进融合应用；五是完善生态体系；六是提升安全防护能力；七是推动开放合作。其中，网络基础设施的将成为工业互联网建设的重点。工信部信息通信管理局局长韩夏在11月3日举办的国务院政策例行吹风会上解释称，工业互联网包括三大体系：网络、平台和安全。其中网络是基础，能够实现生产全要素的泛在互联及数据的顺畅流通。<br><br>《意见》还从6个方面提出工业互联网建设的保障措施。第一，要建立健全法规制度，扩大市场主体平等进入范围，实施包容审慎监管；第二，营造良好市场环境；第三，加大财税支持力度，强化财政资金导向作用；第四，创新金融服务方式，支持扩大直接融资比重；第五，强化专业人才支撑，创新人才使用机制；第六，健全组织实施机制，促进工业互联网与“中国制造2025”协同推进。意见将产生什么影响？<br>&nbsp; &nbsp;<br>国内产业互联网首倡者、《互联网+：产业风口》畅销书作者、中国电子商务研究中心主任曹磊认为：<br>观点一：政策力挺工业互联网成为互联网领域下一风口<br>该意见的出台将加快中国工业互联网的发展，工业互联网对加速我国制造业升级转型、提升工业经济实力大有裨益，其本身的发展也蕴含着巨大的商机，预计到“十三五”末，这一产业的市场规模将突破万亿大关。该意见的出台将为我国工业互联网的发展提供了坚实的保障。当前，工业互联网对中国制造业的影响正在升级，工业大数据被誉为未来的“石油”，工业互联网被公认为互联网领域的下一个风口。我国是工业大国，如果能够依靠互联网等信息技术手段，改变工业的流程、工艺、质量等，转型升级的效果将是巨大的，有助于实现从工业大国到工业强国的提升。扶持和助推工业互联网企业发展，正在成为信息技术为传统制造业转型升级，服务实体经济的重要切入点。<br><br>工业互联网通过系统构建网络、平台、安全三大功能体系，打造人、机、物全面互联的新型网络基础设施，形成智能化发展的新兴业态和应用模式，是推进制造强国和网络强国建设的重要基础。工业互联网作为新兴技术在工业领域的应用，实现了不同生产要素的全新组合，发展工业互联网对于我国实体经济的影响是全方位的。考虑到供给侧结构性改革主要集中于工业原材料领域，打造工业互联网平台将全面提升我国制造业的供给能力和质量，而扩大直接融资比重等相关配套措施则有利于实体经济去杠杆进程。<br><br>观点二：“互联网+”是驱动制造业强基固本的创新引擎<br>制造业是立国之本，强国之基。“互联网+”是驱动制造业强基固本的创新引擎，中国制造业自身的传统发展模式和制造业发展面临瓶颈，亟须以创新驱动转型发展。围绕“互联网+”实施创新驱动发展，利用物联网、云计算、大数据等新技术加速制造业升级，实现智能制造、优质制造、网络制造，进而在生产组织方式、商业模式、产业组织和产业体系等方面产生一系列深远的变化。<br><br>“互联网+”正在成为驱动制造业转型升级的核心要素。当前，以“信息”为核心的制造范式正在形成，制造体系中数据信息的价值正在不断被挖掘。信息网络技术驱动中国制造业转型战略、路径和支撑体系研究的目标是建设制造强国，途径是实现信息网络技术与制造业的深度融合。<br></p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<footer class="main-footer">
+<div class="container">
+<div class="promise">
+<div class="row">
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-roundcheck"></i>
+</div>
+<div class="pull-left">
+<strong>品质保障</strong>
+<p>品质护航 购物无忧</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-time"></i>
+</div>
+<div class="pull-left">
+<strong>极速物流</strong>
+<p>多仓直发 极速配送</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-like"></i>
+</div>
+<div class="pull-left">
+<strong>售后无忧</strong>
+<p>退换无忧 维修无忧</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-goodsfavor"></i>
+</div>
+<div class="pull-left">
+<strong>天天低价</strong>
+<p>天天低价 帮您省钱</p>
+</div>
+</div>
+</div>
+</div>
+<div class="row">
+<div class="col-xs-4">
+<ul class="contact">
+<li>
+<i class="iconfont icon-phone"></i>
+<strong>020-89855351 </strong>
+</li>
+
+<li>
+<i class="iconfont icon-location"></i>
+广东省广州市黄埔区大沙地东319号保利中誉广场2607室
+</li>
+</ul>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>购物指南</dt>
+<dd>
+<a href="16_1.html" >免费注册</a>
+</dd>
+<dd>
+<a href="15_1.html" >购物流程</a>
+</dd>
+<dd>
+<a href="17_1.html" >会员等级</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>支付方式</dt>
+<dd>
+<a href="19_1.html" >货到付款</a>
+</dd>
+<dd>
+<a href="20_1.html" >网银支付</a>
+</dd>
+<dd>
+<a href="21_1.html" >银行转帐</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>售后服务</dt>
+<dd>
+<a href="31_1.html" >退换货政策</a>
+</dd>
+<dd>
+<a href="33_1.html" >退换货申请</a>
+</dd>
+<dd>
+<a href="34_1.html" >退款说明</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>商家服务</dt>
+<dd>
+<a href="36_1.html" >商家入驻</a>
+</dd>
+<dd>
+<a href="37_1.html" >商家帮助</a>
+</dd>
+<dd>
+<a href="38_1.html" >运营服务</a>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+<div class="bottom-nav">
+<ul class="clearfix">
+<li>
+<a href="/article/detail/39_1.html" >隐私政策</a>
+|
+</li>
+<li>
+<a href="/article/detail/39_1.html" >法律声明</a>
+|
+</li>
+<li>
+<a href="/article/detail/37_1.html" >客户服务</a>
+
+</li>
+
+</ul>
+<p><a href="http://www.beian.miit.gov.cn/" class="colorD" target="_blank" rel="noopener noreferrer">Copyright©2020. 广州众咖信息科技服务有限公司 All Rights Reserved 粤ICP备18042113号-2</a></p>
+</div>
+</footer></body>
+</html>

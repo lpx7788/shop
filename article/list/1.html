@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="聚点商城 Team">
+<meta name="copyright" content="聚点商城">
+<meta name="keywords" content="商城动态">
+<meta name="description" content="商城动态">
+<title>商城动态 - 聚点商城</title>
+<link href="/favicon.ico" rel="icon">
+<link href="/resources/common/css/bootstrap.css"  rel="stylesheet">
+<link href="/resources/common/css/font-awesome.css"  rel="stylesheet">
+<link href="/resources/common/css/iconfont.css"  rel="stylesheet">
+<link href="/resources/common/css/base.css"  rel="stylesheet">
+<link href="/resources/shop/css/base.css"  rel="stylesheet">
+<link href="/resources/shop/css/article.css"  rel="stylesheet">
+<link href="/resources/common/css/new/backup.css"  rel="stylesheet">
+<script src="/resources/common/js/new/jquery.min.js"></script>
+<script src="/resources/common/js/new/bootstrap.min.js"></script></script>
+<script src="/resources/common/js/new/jquery.bootstrap-growl.min.js"></script>
+<script src="/resources/common/js/jquery.cookie.js" ></script>
+<script src="/resources/common/js/jquery.qrcode.js" ></script>
+<script src="/resources/common/js/lodash.js" ></script>
+<script src="/resources/common/js/new/URI.min.js"></script>
+<script src="/resources/common/js/new/velocity.min.js"></script>
+<script src="/resources/common/js/new/velocity.ui.min.js"></script>
+<script src="/resources/common/js/base.js" ></script>
+<script src="/resources/shop/js/base.js" ></script>
+</head>
+<body class="shop article-list">
+<script id="mainHeaderMemberInfoTemplate" type="text/template">
+	<%if (localStorage.getItem('username') != ''&&localStorage.getItem('username') != null) {%>
+		<ul class="list-inline">
+			<li>
+				<a><%-localStorage.getItem('username')%></a>
+			</li>
+			<li>
+				<a class="logout" href="/index.html">退出</a>
+			</li>
+		</ul>
+	<%} else {%>
+		<ul class="list-inline">
+			<li>
+				<a href="/member/login.html">登录</a>
+			</li>
+			<li>
+				<a href="/member/register.html">注册</a>
+			</li>
+		</ul>
+	<%}%>
+</script>
+<script id="mainHeaderCartDetailTemplate" type="text/template">
+	<%if (!_.isEmpty(cart.cartItems)) {%>
+		<div class="cart-detail-body">
+			<ul>
+				<%_.each(cart.cartItems, function(cartItem, i) {%>
+					<li>
+						<a href="<%-cartItem.skuPath%>">
+							<img src="<%-cartItem.skuThumbnail%>" alt="<%-cartItem.skuName%>">
+							<span class="text-overflow" title="<%-cartItem.skuName%>"><%-cartItem.skuName%></span>
+						</a>
+						<span>
+							<strong><%-$.currency(cartItem.price, true, false)%></strong>
+							&times; <%-cartItem.quantity%>
+						</span>
+					</li>
+				<%});%>
+			</ul>
+		</div>
+		<div class="cart-detail-footer">
+			共计:
+			<strong><%-$.currency(cart.effectivePrice, true, true)%></strong>
+			<a class="pull-right" href="../../cart/list.html">商品结算</a>
+		</div>
+	<%} else {%>
+		<p>您的购物车是空的，请去挑选您的商品！</p>
+	<%}%>
+</script>
+<script>
+		$().ready(function() {
+
+			var $document = $(document);
+			var $mainHeaderTopAd = $("#mainHeaderTopAd");
+			var $mainHeaderTopAdClose = $("#mainHeaderTopAd button.close");
+			var $mainHeaderMemberInfo = $("#mainHeaderMemberInfo");
+			var $mainHeaderProductSearchForm = $("#mainHeaderProductSearch form");
+			var $searchType = $("#mainHeaderProductSearch [data-search-type]");
+			var $mainHeaderProductSearchKeyword = $("#mainHeaderProductSearch input[name='keyword']");
+			var $mainHeaderCart = $("#mainHeaderCart");
+			var $mainHeaderCartQuantity = $("#mainHeaderCart em");
+			var $mainHeaderCartDetail = $("#mainHeaderCart div.cart-detail");
+			var $mainHeaderMainNavInkBar = $("#mainHeaderMainNav div.ink-bar");
+			var $mainHeaderMainNavItem = $("#mainHeaderMainNav li");
+			var $mainHeaderMainNavActiveItem = $("#mainHeaderMainNav li.active");
+			var mainHeaderMemberInfoTemplate = _.template($("#mainHeaderMemberInfoTemplate").html());
+			var mainHeaderCartDetailTemplate = _.template($("#mainHeaderCartDetailTemplate").html());
+
+			// 顶部广告
+			if (sessionStorage.getItem("mainHeaderTopAdHidden") == null) {
+				$mainHeaderTopAd.show();
+			}
+
+			// 顶部广告
+			$mainHeaderTopAdClose.click(function() {
+				sessionStorage.setItem("mainHeaderTopAdHidden", "true");
+				$mainHeaderTopAd.velocity("slideUp");
+			});
+
+			// 会员信息
+			$mainHeaderMemberInfo.html(mainHeaderMemberInfoTemplate({
+				currentUser: $.getCurrentUser()
+			}));
+
+			// 用户注销
+			$mainHeaderMemberInfo.on("click", "a.logout", function() {
+				localStorage.setItem('username','')
+				localStorage.setItem('authority','')
+				localStorage.setItem('token','')
+				let cartDatas = JSON.parse(localStorage.getItem('cartDatas'))
+				cartDatas.cartItems = []
+				localStorage.setItem('cartDatas',JSON.stringify(cartDatas))
+				window.location.href=document.referrer;
+                $document.trigger("loggedOut.shopxx.user", $.getCurrentUser());
+			});
+
+			// 搜索类型
+			$searchType.click(function() {
+				var $element = $(this);
+				var searchType = $element.data("search-type");
+
+				$element.closest("div.input-group").find("[data-toggle='dropdown'] span:not(.caret)").text($element.text());
+
+				switch (searchType) {
+					case "product":
+						$mainHeaderProductSearchForm.attr("action", "/product/search.html");
+						break;
+					case "store":
+						$mainHeaderProductSearchForm.attr("action", "/store/search.html");
+						break;
+				}
+			});
+
+			// 商品搜索
+			$mainHeaderProductSearchForm.submit(function() {
+				if ($.trim($mainHeaderProductSearchKeyword.val()) === "") {
+					return false;
+				}
+			});
+
+			// 购物车
+				// 购物车
+			$mainHeaderCart.hover(function() {
+				var loading = true;
+
+				setTimeout(function() {
+					if (loading) {
+						$mainHeaderCartDetail.html('<div class="cart-loader"><span></span><span></span><span></span><span></span><span></span></div>');
+					}
+				}, 500);
+				let data = $.getCurrentCart()
+
+					loading = false;
+					$mainHeaderCartDetail.html(mainHeaderCartDetailTemplate({
+						cart: data
+					}));
+
+			});
+
+			// 购物车数量
+			var currentCartQuantity = $.getCurrentCartQuantity();
+			if (currentCartQuantity != null) {
+				$mainHeaderCartQuantity.text(currentCartQuantity < 100 ? currentCartQuantity : "99+");
+			}
+
+			// 购物车数量
+			$document.on("complete.shopxx.setCurrentCartQuantity", function(event, quantity) {
+				$mainHeaderCartQuantity.text(quantity < 100 ? quantity : "99+");
+			});
+
+			// 主导航
+			if ($mainHeaderMainNavItem.length > 0) {
+				if ($mainHeaderMainNavActiveItem.length < 1) {
+					$mainHeaderMainNavActiveItem = $mainHeaderMainNavItem.first();
+				}
+
+				$mainHeaderMainNavInkBar.css({
+					width: $mainHeaderMainNavActiveItem.outerWidth(),
+					display: "block",
+					left: $mainHeaderMainNavActiveItem.position().left
+				});
+
+				$mainHeaderMainNavItem.hover(function() {
+					var $element = $(this);
+
+					$mainHeaderMainNavInkBar.css({
+						width: $element.outerWidth(),
+						left: $element.position().left
+					});
+				}, function() {
+					$mainHeaderMainNavInkBar.css({
+						width: $mainHeaderMainNavActiveItem.outerWidth(),
+						left: $mainHeaderMainNavActiveItem.position().left
+					});
+				});
+			}
+
+		});
+		</script>
+<header class="main-header">
+<div id="mainHeaderTopAd" class="top-ad">
+<button class="close" type="button">
+<span>&times;</span>
+</button>
+<a href="/product/detail/51.html"  target="blank">
+<img src="/images/cc976454-1494-43de-96a8-fda391c880a9.jpg"  alt="空调0元安装放心购">
+</a>
+</div>
+<div class="top-nav">
+<div class="container">
+<div class="row">
+<div class="col-xs-12">
+<div id="mainHeaderMemberInfo" class="pull-left"></div>
+<ul class="list-inline pull-right">
+<li>
+<a href="/member/login.html" >会员中心</a>
+</li>
+<li>
+<a href="../../member/order/list.html" >我的订单</a>
+</li>
+<li class="top-nav-dropdown">
+<a href="javascript:;">
+商家服务
+<span class="caret"></span>
+</a>
+<ul class="business">
+<li>
+<a href="../../business/login-redirectUrl=-business-index.html"  target="_blank" rel="noopener noreferrer">商家中心</a>
+</li>
+<li>
+<a href="../../business/register.html" >商家入驻</a>
+</li>
+</ul>
+</li>
+
+
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="container">
+<div class="row">
+<div class="col-xs-3 logo-container" >
+    <a>
+        <img  class="logo-img" src="/images/logo.png"  alt="聚点商城">
+        <div class="logo-text" >
+            <h3>聚点商城</h3>
+        </div>
+    </a>
+</div>
+<div class="col-xs-6">
+<p class="empty-header-center-block"></p>
+</div>
+<div class="col-xs-3">
+
+</div>
+</div>
+<div class="row">
+<div class="col-xs-2">
+<a class="product-category" href="../../product_category.html" >
+<i class="iconfont icon-sort"></i>
+所有商品分类
+</a>
+</div>
+<div class="col-xs-10">
+<div id="mainHeaderMainNav" class="main-nav">
+<div class="ink-bar"></div>
+<ul>
+<li>
+<a href="../../index.html" >首页</a>
+</li>
+<li>
+<a href="../../product/list/1.html" >手机数码</a>
+</li>
+<li>
+<a href="../../product/list/2.html" >办公家电</a>
+</li>
+<li>
+<a href="../../product/list/3.html" >精品服饰</a>
+</li>
+<li>
+<a href="../../product/list/4.html" >珠宝饰品</a>
+</li>
+<li>
+<a href="../../product/list/5.html" >美妆护肤</a>
+</li>
+
+<li>
+<a href="../../product/list-type=EXCHANGE.html" >积分商城</a>
+</li>
+<li>
+<a href="../../product/list-promotionPluginId=groupBuyingPromotionPlugin.html" >团购商城</a>
+</li>
+<li class="active">
+<a href="1.html" >商城动态</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</header><script id="historyProductTemplate" type="text/template">
+	<h4>
+		浏览记录
+		<%if (!_.isEmpty(data)) {%>
+			<a class="clear pull-right" href="javascript:;">清空</a>
+		<%}%>
+	</h4>
+	<%if (!_.isEmpty(data)) {%>
+		<ul class="clearfix">
+			<%_.each(data, function(product, i) {%>
+				<li>
+					<a href="<%-product.path%>" target="_blank" rel="noopener noreferrer">
+						<img class="img-responsive center-block" src="<%-product.thumbnail != null ? product.thumbnail : "/images/default_thumbnail_product_image.png"%>" alt="<%-product.name%>">
+						<h5 class="text-overflow" title="<%-product.name%>"><%-product.name%></h5>
+					</a>
+				</li>
+			<%});%>
+		</ul>
+	<%} else {%>
+		<p>暂无信息</p>
+	<%}%>
+</script>
+<script>
+			$().ready(function() {
+
+				var $window = $(window);
+				var $document = $(document);
+				var $body = $("body");
+				var $mainSidebar = $("#mainSidebar");
+				var $mainSidebarCartQuantity = $("#mainSidebarCart em");
+				var $mainSidebarTooltipToggle = $("#mainSidebar [data-toggle='tooltip']");
+				var $historyProductCollapse = $("#historyProductCollapse");
+				var $mainSidebarQrcodeContent = $("#mainSidebarQrcode div.content");
+				var $mainSidebarBackTop = $("#mainSidebarBackTop");
+				var $mainSidebarHistoryProduct = $("#mainSidebarHistoryProduct");
+				var mainSidebarBackTopHidden = true;
+				var mainSidebarExpanded = false;
+				var historyProductTemplate = _.template($("#historyProductTemplate").html());
+				var historyProductIdsLocalStorageKey = "historyProductIds";
+
+				// 购物车数量
+				var currentCartQuantity = $.getCurrentCartQuantity();
+
+				if (currentCartQuantity != null) {
+					$mainSidebarCartQuantity.text(currentCartQuantity < 100 ? currentCartQuantity : "99+");
+				}
+
+				// 购物车数量
+				$document.on("complete.shopxx.setCurrentCartQuantity", function(event, quantity) {
+					$mainSidebarCartQuantity.text(quantity < 100 ? quantity : "99+");
+				});
+
+				// 提示
+				$mainSidebarTooltipToggle.tooltip();
+
+				// 浏览记录展开/折叠
+					// $document.on("click", function(e) {
+				// 	if ($mainSidebar.data("collapse-disabled") === "true") {
+				// 		return;
+				// 	}
+				// 	if ($historyProductCollapse[0] === e.target || $.contains($historyProductCollapse[0], e.target) || (mainSidebarExpanded && !$.contains($mainSidebar[0], e.target))) {
+				// 		$mainSidebar.velocity({
+				// 			right: mainSidebarExpanded ? -300 : 0
+				// 		}, {
+				// 			begin: function() {
+				// 				$mainSidebar.data("collapse-disabled", "true");
+				// 				if (!mainSidebarExpanded) {
+				// 					loadHistoryProduct();
+				// 				}
+				// 			},
+				// 			complete: function() {
+				// 				$mainSidebar.removeData("collapse-disabled");
+				// 				mainSidebarExpanded = !mainSidebarExpanded;
+				// 			}
+				// 		}, 500);
+				// 	}
+				// });
+
+				// 加载浏览记录
+				function loadHistoryProduct() {
+					var historyProductIdsLocalStorage = localStorage.getItem(historyProductIdsLocalStorageKey);
+					var historyProductIds = historyProductIdsLocalStorage != null ? JSON.parse(historyProductIdsLocalStorage) : [];
+
+					$.get("/product/history", {
+						productIds: historyProductIds
+					}).done(function(data) {
+						localStorage.setItem(historyProductIdsLocalStorageKey, JSON.stringify($.map(data, function(item) {
+							return item.id
+						})));
+						$mainSidebarHistoryProduct.html(historyProductTemplate({
+							data: data
+						}));
+					});
+				}
+
+				// 清空浏览记录
+				$mainSidebarHistoryProduct.on("click", ".clear", function() {
+					localStorage.removeItem(historyProductIdsLocalStorageKey);
+					$mainSidebarHistoryProduct.html(historyProductTemplate({
+						data: {}
+					}));
+					return false;
+				});
+
+				// 二维码
+				$mainSidebarQrcodeContent.qrcode({
+					width: 100,
+					height: 100,
+					text: location.href
+				});
+
+				// 返回顶部
+				$window.scroll(_.throttle(function() {
+					if ($window.scrollTop() > 500) {
+						if (mainSidebarBackTopHidden) {
+							mainSidebarBackTopHidden = false;
+							$mainSidebarBackTop.velocity("fadeIn");
+						}
+					} else {
+						if (!mainSidebarBackTopHidden) {
+							mainSidebarBackTopHidden = true;
+							$mainSidebarBackTop.velocity("fadeOut");
+						}
+					}
+				}, 500));
+
+				// 返回顶部
+				$mainSidebarBackTop.click(function() {
+					$body.velocity("stop").velocity("scroll", {
+						duration: 1000
+					});
+				});
+
+			});
+		</script>
+<aside id="mainSidebar" class="main-sidebar clearfix">
+<div class="main-sidebar-body">
+<ul>
+<li>
+<a id="mainSidebarCart" class="cart" href="../../cart/list.html" >
+<i class="iconfont icon-cart"></i>
+<span>购物车</span>
+<em>0</em>
+</a>
+</li>
+<li>
+<a href="../../member/order/list.html"  title="我的订单" data-toggle="tooltip" data-placement="left">
+<i class="iconfont icon-form"></i>
+</a>
+</li>
+
+<li>
+<a href="/member/product_favorite/list.html"  title="我的收藏" data-toggle="tooltip" data-placement="left">
+<i class="iconfont icon-like"></i>
+</a>
+</li>
+<li>
+<a href="../..//member/coupon_code/list.html"  title="优惠券" data-toggle="tooltip" data-placement="left">
+<i class="iconfont icon-ticket"></i>
+</a>
+</li>
+<li>
+
+</li>
+</ul>
+<a id="mainSidebarBackTop" class="back-top" href="javascript:;" title="返回顶部">
+<i class="iconfont icon-top"></i>
+</a>
+</div>
+<div class="main-sidebar-right">
+<div id="mainSidebarHistoryProduct" class="history-product"></div>
+</div>
+</aside> <main>
+<div class="container">
+<div class="row">
+<div class="col-xs-2">
+<div class="hot-article-category">
+<div class="hot-article-category-heading">
+<h4>热点分类</h4>
+</div>
+<div class="hot-article-category-body">
+<ul>
+<li>
+<a href="1.html" >商城动态</a>
+</li>
+<li>
+<a href="2.html" >促销活动</a>
+</li>
+<li>
+<a href="3.html" >购物指南</a>
+</li>
+<li>
+<a href="4.html" >支付方式</a>
+</li>
+<li>
+<a href="5.html" >配送方式</a>
+</li>
+<li>
+<a href="6.html" >订单服务</a>
+</li>
+<li>
+<a href="7.html" >售后服务</a>
+</li>
+<li>
+<a href="8.html" >商家服务</a>
+</li>
+</ul>
+</div>
+</div>
+<div class="hot-article">
+<div class="hot-article-heading">
+<h4>热点文章</h4>
+</div>
+<div class="hot-article-body">
+<ul>
+<li class="text-overflow">
+<a href="../detail/8_1.html"  title="高效配送已成为必需 快递业亟待转型升级">高效配送已成为必需 快递业亟待转型升级</a>
+</li>
+<li class="text-overflow">
+<a href="../detail/4_1.html"  title="农村电商加速布局助力乡村振兴">农村电商加速布局助力乡村振兴</a>
+</li>
+<li class="text-overflow">
+<a href="../detail/7_1.html"  title="智能化商业布局解决物流难题">智能化商业布局解决物流难题</a>
+</li>
+<li class="text-overflow">
+<a href="../detail/1_1.html"  title="2018年电商发展5大趋势预测">2018年电商发展5大趋势预测</a>
+</li>
+<li class="text-overflow">
+<a href="../detail/6_1.html"  title="政策助力物流绿色化发展，供应链亟需落实解决方案">政策助力物流绿色化发展，供应链亟需落实解决方案</a>
+</li>
+<li class="text-overflow">
+<a href="../detail/5_1.html"  title="双11新消费缘何撬动全球经济">双11新消费缘何撬动全球经济</a>
+</li>
+<li class="text-overflow">
+<a href="../detail/3_1.html"  title="电子支付过程中的安全思考">电子支付过程中的安全思考</a>
+</li>
+<li class="text-overflow">
+<a href="../detail/2_1.html"  title="国务院力挺工业互联网 互联网+成新引擎">国务院力挺工业互联网 互联网+成新引擎</a>
+</li>
+</ul>
+</div>
+</div>
+<script>
+		$().ready(function() {
+
+			var $articleSearchForm = $("#articleSearchForm");
+			var $keyword = $("#articleSearchForm [name='keyword']");
+
+			// 搜索
+			$articleSearchForm.submit(function() {
+				if ($.trim($keyword.val()) === "") {
+					return false;
+				}
+			});
+
+		});
+		</script>
+<div class="article-search">
+<form id="articleSearchForm" action="/article/search.html" method="get">
+
+</form>
+</div> </div>
+<div class="col-xs-10">
+<ol class="breadcrumb">
+<li>
+<a href="../../index.html" >
+<i class="iconfont icon-homefill"></i>
+首页
+</a>
+</li>
+<li class="active">商城动态</li>
+</ol>
+<div class="list panel panel-default">
+<div class="panel-body">
+<ul>
+<li>
+<h4>
+<a href="../detail/8_1.html"  title="高效配送已成为必需 快递业亟待转型升级">高效配送已成为必需 快递业亟待转型升级</a>
+</h4>
+<p class="text-overflow">2017年双十一购物盛典落下帷幕，在今年的双十一活动中，包裹数量预计达到约15亿个。再加上发货后的退货和重新配送等，物流可能会有近1个月难以恢复正常运转。延迟送货带来的纠纷也接连不断，已上升为社会问题。一边是快速增长的快递业务量，另一边是越来越“迫不及待”取包裹的消费者，这促使快递行业必须思考和解决一个难题——如何让海量包裹更快更好地送达每一个消费者手中，快速高效的配送已成为必需。 因此，传统的快递业需要一场技术革命，进行转型升级，而智慧物流是大势所趋。 近年来，以“互联网+”高效物流为标志的“智慧物流”加速起步，智能物流未来的发展方向首先是降低成本，同时提高质量。为此，智能物流的技术将主要体现四个方面：人工智能、GIS技术、自动识别和数据挖掘。在工业4.0时代，智能物流的体系研发和建设成为电商竞争的关键。 据了解，申通快递成功开发的拥有自主知识产权的“梧桐”系统在“双十一”期间全面启用，为国内国际业务、全网各网点转运中心提供一体化的操作、查询、结算、管理等服务。圆通则通过“大数据”体系用数字代码进行地域分单，用数据预测各快递节点的收包裹量，监测实时配送信息。韵达已上线13个信息处理平台、50多套信息系统,末端智能优化系统、车辆动态智能监控系统、包含云仓的供应链管理系统能有效应对快递旺季。而中通自主研发的中天系统在“双十一”期间可提供多维度的数据视图和量化依据，实时监控全网各个快递网点的包裹情况和分拣中心的转运情况…… 各快递公司在不断增强硬件的同时，不断加大信息技术建设步伐,4G视频监控系统、车辆监控调度系统、驾驶员在途APP报备、APP到车签到系统、车况检测系统等各类“黑科技”先后投入使用。 目前，包括亚马逊、京东在内的众多电商巨头均在智能物流领域开展布局，阿里的巨额投入意图也很明显--抢占未来智能物流万亿市场。这也意味着，新零售、全球化物流的竞争将进入白热化阶段。 “依靠人力揽件、发件的时代一去不返了，未来，智能、科技将在行业发展中发挥越来越关键的作用。谁跟不上时代和科技的发展,很快就会失去市场，被淘汰。”一快递公司副总裁告诉记者，“智能物流”的趋势方兴未艾，未来将有更多的“黑科技”注入快递行业中。目前2017年已将要过去，在年底智能物流能否交出一份满意的年终发展答卷，我们还需拭目以待。</p>
+<p>
+<span class="small text-gray">聚点商城</span>
+<span class="small text-gray" title="2018-01-25 00:00:59">2018-01-25</span>
+</p>
+</li>
+<li>
+<h4>
+<a href="../detail/7_1.html"  title="智能化商业布局解决物流难题">智能化商业布局解决物流难题</a>
+</h4>
+<p class="text-overflow">众所周知，快递物流配送是连接商品和消费者之间最重要的一环，而这中间涉及到的仓储管理、干线支线物流以及最后一公里的配送的各个环节，自第一届“双11”以来出现的大面积爆仓、配送时间过长等问题，一直是困扰电商、物流行业都头疼的难题。 京东是我国目前领先的电商，拥有较完善的自建物流体系。据京东集团副总裁、京东商城物流规划发展部负责人傅兵介绍，今年“双11”购物季期间，京东通过大数据的分析预测，在原有线路基础上临时开通40余条干线以加快货物流转，以保证全国近百个城市的运输效率；此外，“双11”期间京东还将开通夜间上门接货服务，部分城市时间可延后至21点；京东目前在全国范围内的自动分拣设备的日均处理能力已经达百万以上，经过技术升级的通州自动化分拣中心在10月份正式投入运营，目前可承接在“双11”期间全北京的中小件订单。另外，将首次引进智能机器人设备，机器人仓、机器人分拣中心两个自动化设备将在“双11”期间正式启用。 “双11”期间北京、上海等九大城市的京东3C品类仓将联合提速，消费者在11日下单，最快当天上午就可以收到购买的商品；此外，冷链物流建设也是京东今年的重点项目；而由京东战略投资的“新达达”将有逾250万众包运力支援京东的物流配送，成为京东物流业务的补充。 今年京东的一大亮点是人工智能技术在供应链、仓储配送等方面的应用。据介绍，继今年“6·18”京东自主研发的无人机实现首次送货之后，京东无人车将在“双11”第一次开始送货试运营，无人机和无人车也将在“双11”期间亮相。 除了上述三款无人智能产品之外，京东商城研发副总裁马松表示，“双11”期间京东还从智能卖场、JIMI无人客服、智慧营销、智慧供应链等方面进行了完整的智能化商业布局。 “总体而言消费者对‘双11’购物体验的要求会越来越高，品质购物将是未来网购市场的大趋势。”赵振营告诉笔者，最初兴起的网络购物市场是一个典型的劣币驱逐良币的市场，随着网络购物市场的不断发展城市劣币驱逐良币的情况会慢慢变好。“目前的市场处于劣币驱逐良币现象逐渐减弱的情况。消费者在网络购物中也慢慢开始意识到服务质量、商品品牌、商品质量等因素，如果网购体验不佳的话，一种情况下是消费者会奔向对货品控制有保障、服务质量好的网络购物平台，另外一种情况则是回归到线下购物。”  他同时认为，目前京东提出的“理性消费”与其他电商平台是差异化竞争的一个宣传点，是否能够真正通过京东一系列的做法引导消费者逐渐实现理性消费，一方面可能需要时间，另外还需要等到市场的检验。</p>
+<p>
+<span class="small text-gray">聚点商城</span>
+<span class="small text-gray" title="2018-01-25 00:00:58">2018-01-25</span>
+</p>
+</li>
+<li>
+<h4>
+<a href="../detail/6_1.html"  title="政策助力物流绿色化发展，供应链亟需落实解决方案">政策助力物流绿色化发展，供应链亟需落实解决方案</a>
+</h4>
+<p class="text-overflow">近日国家发布了《全国电子商务物流发展专项规划（2016-2020年）》、《关于加快我国包装产业转型发展的指导意见》、《关于协同推进快递业绿色包装工作的指导意见》等政策意见，把实现物流绿色化再次提上了日程。  物流规模的不断扩大，促进了经济的迅猛发展。据数据显示，2016年，我国的物流费用占GDP的比重为14.9%，比美、日德等发达国家高出近一倍。快递业务量到达312.8亿件，人均快递使用量接近23件，同比增长近8件。 为了营造“绿色快递，人人有为”的良好氛围，包装材料应用逐步标准化，为绿色物流的发展奠定了基础。据了解，快递协议中，客户电子运单使用率达到90%以上，这不仅有利于推广使用中转箱、笼车等设备，也有利于快递业包装治理体系的建立和形成。 在去年中国快递业的包装报告中，不难发现，纸箱使用量占比居高不下，成为包材中污染最严重的一项。这全因为我国快递包装回收率一直小于20%，无法高效循环，严重阻碍电商绿色包装和绿色物流的推进。 一个商品包装不仅需要考虑产品的安全性，还要考虑各类设备包装的标准化程度，如果商品分拣后与包装不匹配的话，很可能导致效率浪费，人力浪费。前段时间出现的可循环共享快递，帮助节约了上千万个纸箱，共享快递盒帮助物流从物料源头提高了重复利用效率，说明共享理念在物流行业的实践不止存在于物流园中。 从专业角度来讲，供应链整体绿色化水平对于物流绿色化发展起着至关重要的作用。物流环节如何实现环保和绿色化不单单是做到技术的升级，更是要在新零售时代，全面加强规模效应的形成。 发展绿色物流是实现可持续发展的必由之路，相信在企业和政府的共同努力下，绿色物流体系会更加健全，物流业的迅速发展也在朝着经济又好又快的目标而努力。</p>
+<p>
+<span class="small text-gray">聚点商城</span>
+<span class="small text-gray" title="2018-01-25 00:00:57">2018-01-25</span>
+</p>
+</li>
+<li>
+<h4>
+<a href="../detail/5_1.html"  title="双11新消费缘何撬动全球经济">双11新消费缘何撬动全球经济</a>
+</h4>
+<p class="text-overflow">近日，《人民日报》连续刊文点赞天猫，以《信心指数持续攀升，前十月实现较高增速——新消费撬动中国经济》、《向着网络强国扬帆远航》为题，指出国内消费品零售总额不断攀升、中国消费者信心指数持续增长，其中天猫的推动作用密不可分，新零售新消费正成功撬动中国经济甚至是全球经济。 “东西买多了不想拎回家？如今，借助天猫新零售，商场已经可以快递上门。” 昨日，人民日报再次以《美国农产品争搭中国电商“高铁》为题，报道了美国蛇果等农产品通过天猫卖到中国，既助推中国消费升级，也让美国农业中小企业赢得新生机遇。 据国家统计局数据显示，今年1-10月，全国实现社会消费品零售总额29.7万亿元，同比保持两位数的较高增速。而根据全球知名绩效管理公司尼尔森发布的最新报告显示，中国消费者信心指数已连续四个季度实现增长，创下2013年底以来的新高；消费意愿达到2014年以来的最高值。 无独有偶，商务部重点监测的专业店、百货店销售额同比各增6%和1.6%，增速较上年同期加快3.5和0.6个百分点，即便是以前买东西不方便的农村消费者，如今搭上电商快车，也能轻松“买全球”。 在人民日报看来，这就是天猫新零售帮助传统商业实现数字化改造、带动实体门店回暖的结果，推动了中国消费品质全面的升级。 此前，天猫推出了包括门店自提、门店发货、线上线下融合等一系列创新，为传统品牌带来了新的商机。今年双11，新零售的规模进一步扩大，其中服饰300个品牌50000家门店与天猫实现了线上线下打通，门店服务数量增长了235%，全渠道成交和单量是去年2倍。 绫致集团在天猫双11开始后1分钟就宣告成交过亿，单日销量突破10亿。亮眼的成交也为绫致线下带来大量订单、客流，据悉，绫致集团包括门店自提、门店发货在内的全渠道成交额达到去年全天的173%。优衣库今年全国500多家门店都支持天猫下单、门店自提服务，至双11当天下午5点，成交额就已达到去年全天全渠道成交的4.5倍。 而天猫也推动一系列国际优质商品入华，华盛顿州苹果、西雅图樱桃、阿拉斯加帝王蟹，近年来纷纷漂洋过海走俏中国消费者餐桌。大批美国优质农产品搭乘中国电商“高铁”入华，既满足中国消费升级的需求，也增加美国就业和税收，更助力美国中小企业分享全球化红利。 对此，《人民日报》在评论文章中不吝赞美，“随着我国供给侧结构性改革深入推进，消费市场正发生着质变：在流通环节，线上线下融合发展；在生产环节，商品服务同步升级，这些新供给激发购买愿望，让人们更乐意打开钱袋子”。“互联网不仅催生了新业态、新模式，还让众多传统产业再现生机活力。各行各业都在发挥信息化对全要素生产率的提升作用，推动互联网和实体经济深度融合。如今，许多生产车间俨然是大数据工厂，接收订单、安排生产、物流配送都是信息化处理，机器换人，精确高效”。 “新零售将重塑很多行业，甚至改变我们的日常习惯。”港媒jinsight在报道中这样描述。通过大数据和人工智能，天猫已经能够越来越精准的预测消费者需求，孵化趋势品类，撬动全球经济。 如今，这场商业奥林匹克的参与人数和广度，甚至超过了华尔街和花旗银行等的预期。正如大名鼎鼎的英国广播公司BBC对此所总结：中国已经不再是跟随者，而是世界电商和用户体验的领头羊。当午夜的钟声敲响的时候，世界应该看到，中国已经前行了多远。</p>
+<p>
+<span class="small text-gray">聚点商城</span>
+<span class="small text-gray" title="2018-01-25 00:00:56">2018-01-25</span>
+</p>
+</li>
+<li>
+<h4>
+<a href="../detail/4_1.html"  title="农村电商加速布局助力乡村振兴">农村电商加速布局助力乡村振兴</a>
+</h4>
+<p class="text-overflow">农村电商再创佳绩。刚刚过去的“双十一购物狂欢节”，农村淘宝总订单量接近2000万笔，成交额接近32亿元，比去年天猫双十一增长了8倍。京东、苏宁在农村的销售额也较去年同期大幅增长。除了国内三大电商外，不少电商，比如拼多多、乐村淘等在农村的业绩也非常突出。 据商务部委托映潮科技(农村电商大数据中心)开展数据分析显示，2017年“双十一”期间(11月1日--11月11日)农村实现网络零售额846.08亿元，其中“双十一”当天实现网络零售额392.40亿元，同比增长66.53%，在“双十一”期间占比为46.38%。 事实上，自2014年以来，农村电商普遍持续受到关注。“推动农村电子商务发展”连续四年被写进中央一号文件。一系列政策在推动农村电商加快发展，各大电商也纷纷进入农村电子商务领域：阿里巴巴的“千县万村”计划、京东的“星火燎原”、苏宁的“乡村易购”、邮政的“邮掌柜”、联想的“云农场”等。 巨头电商在农村市场的成绩，宣告着电商响应国家号召和加快农村布局的成效显现。同时，我们也要看到农村电商利用资源优势，带动农村产业和经济发展走上快车道，助推农村发展振兴。 农村市场当下有了巨大的发展空间，成为各大电商企业争抢的“蓝海”，各大电商企业也不断加快在农村的平台和体系建设，电商平台阿里巴巴、京东和苏宁是国内电商市场中的典型代表。 2014年阿里巴巴宣布启动“千县万村计划”战略，计划在未来3至5年内投资100亿元，建立1000个县级服务中心和10万个村级服务站。发展到至今，阿里巴巴在近500个县，建立了28000多个村点，农村淘宝有近1000个专属员工、2.8万名“村小二”、5万个服务体系中的工作人员。2016年7月，阿里农村淘宝已升级至“3.0战略”，村淘合伙人于10月28日正式更名为“村小二”，意图用新模式使阿里巴巴全生态服务体系下沉到农村，为村民提供覆盖生产和生活场景的多项服务产品。阿里巴巴将农村战略作为三大战略之一，承载着把农村经济推向市场的任务。 而在今年4月，刘强东更是宣布“未来五年，京东将在全国开设超过100万家京东便利店。其中一半在农村，每个村都有。这是继1万家京东家电专卖店计划后的第三个线下合作项目。”业内人士分析，从整体布局来看，这是京东针对农村市场转换了拓展思路，以实体的方式“渗透”农村市场。与此同时，合作的线下店是线上结合线下版本的创新综合体，能够成为京东的分销渠道。 苏宁也在农村市场不断加码。2016年，苏宁易购投入50亿元，兴建了近2000家苏宁易购直营店、1900多家苏宁易购授权服务网点、200个线上地方特色馆，打造20个“最美乡村”样本，将苏宁在三四级市场的物流覆盖率提升至87%。而今年为了响应国家的号召，苏宁易购规划在农村市场再开1000家苏宁易购直营店，继续加码农村电商战略。 另外，商务部数据显示，阿里巴巴“千县万村”计划已覆盖约700个县3万个村，合伙人超过3万人，京东已招募30万名乡村推广员，苏宁加速本地化进程建设服务点超过1万家。 “互联网产业变更的大格局，城市电商已经饱和，各大电商开始抢占农村市场，发展缓慢的农村电商也开始受到关注。”中国电子商务研究中心主任曹磊对《中国产经新闻》记者表示，虽然农村的商业生态既有其复杂的一面，但其足够的发展潜力更是亮点。 北京工商大学经济学院教授、中国食品(农产品)安全电子商务院院长洪涛在接受《中国产经新闻》记者采访时表示，农村电商从2014年开始迅猛发展，基础设施、平台(线上和线下)、技术不断完善，重视对生态产品的挖掘，再加上国家政策的支持，这是电商在农村取得巨大成绩的重要原因。 值得一提的是，洪涛认为，这些年农村电商的发展，不仅形成了优质产品好货下乡的“新零售”态势，也在不断打通农村产品进城“直供直销”的新链路。同时，电商平台开始注重搭建线上与线下两大平台互动，注重生态产品、旅游资源的挖掘，在新农产品的质量和品牌打造上下功夫，推动产品所在地的产业扶贫。比如，最近农业部官员公开点赞农村电商的“洛川苹果”产业扶贫模式，并当作范例在全国推广。 事实上，电商助力农村经济发展早已在路上。社交电商平台拼多多，在今年帮助陕西华阴市苗家村卖出1.5万斤陕西核桃，五天卖出100万斤中牟大蒜，帮助陕西贫困村开网店卖出70万件红枣，为贫困地区群众解决了销售难、销路不畅的困境。 作为农村淘宝的精准扶贫项目，产自新疆地区的阿克苏苹果仅用时12个小时，就在天猫上卖了170万斤。另外，村淘跟天猫联合销售的20款农产品，“双十一”当天完成了4.5亿元的成交额， 今年“双十一”的10小时内，山东菏泽市万乾集村村民销售床上四件套4000多单，价值500万左右。而属于山东欠发达的市区菏泽，农村相对落后，农村电商直接拉动了贫困地区的发展。 乐村淘也在“双十一”积极发力农村市场，开展线下线上相结合的模式，将高岭镇黑米、龙湾乡百香果，还有各乡镇的原种豆类，地苏镇的编织草帽等农特产品销售出去，在今年的11月11日到12日，乐村淘在广西都安，实现农产品和工艺品线上线下销售额8万余元。 的确，电子商务促进农村产业扶贫和脱贫也取得了不少成绩。数据显示，电商进农村综合示范县网络销售额增长势头良好。756个电子商务进农村综合示范县共实现网络零售额259.60亿元，在农村网络零售额中占比达到30.68%，其中“双十一”当天实现网络零售额118.72亿，同比增长88.21%。 与此同时，国家级贫困县也收获良好业绩。全国832个国家级贫困县“双十一”期间实现网络零售额85.26亿元，在农村网络零售额中占比为10.08%，其中“双十一”当天实现网络零售额42.63亿，同比增长102.48%。 农村电商的发展在农村地区创造了一条新的产业链，其中包括产品生产、加工、仓储、检验、包装、分销、物流等环节，完整的产业链对带动就业有了更大帮助。 “目前农产品上行与工业品下乡问题仍然没有很好解决。农民信息化程度低、购买力有限。从全国范围内来看农村电商还没有出现真正意义上成功的模式。” 各大电商企业在县城和乡镇的布局加速开展，我国农村电子商务迎来良好的发展机遇：政策支持力度空前加大、农村互联网普及率逐年提高、农村居民消费能力逐步提升、农村电商人员就业日渐本地化。农村电商成为影响我国农村经济发展、助力乡村振兴中一股不可忽视的新兴力量，预示着农村电商有着良好的发展前景。</p>
+<p>
+<span class="small text-gray">聚点商城</span>
+<span class="small text-gray" title="2018-01-25 00:00:55">2018-01-25</span>
+</p>
+</li>
+<li>
+<h4>
+<a href="../detail/3_1.html"  title="电子支付过程中的安全思考">电子支付过程中的安全思考</a>
+</h4>
+<p class="text-overflow">近些年，政府部门发布多个文件支持电子支付与电子商务的融合发展，特别是2016年5月20日国家发改委等部门发布的《关于推动电子商务发展有关工作的通知》中提到健全电子商务支撑体系，推动电子支付创新应用，大力发展移动支付。一方面随着监管层对支付机构的监管收紧，多家支付机构被罚，支付牌照已经进入存量“洗牌期”，现存支付机构应严格遵循行业规范开展业务；另一方面随着电子支付应用场景的不断扩大，电子支付的安全性也应引起人们的重视。 在2009年某电子商务平台和第三方支付平台网络服务合同纠纷一案中，由于国家对支付业务尚未制定相应的国家标准、行业标准，在发生黑客攻击的情况下，无法判定各方是否尽到安全保障义务，而仅根据双方的协议及双方提供的证据认定各方责任，最终法院在判决理由中认为电子商务平台负有当妥善保管商户号和密码的责任，第三方支付平台对自身系统的安全和信息保密负有认真和谨慎义务，其有责任保证电子支付业务处理系统的设计和运行能够避免电子支付交易数据被泄露，而对于黑客攻击支付平台是否由于电子支付平台存在安全隐患，应由电子商务平台即商户承担举证责任。 分析该判例笔者发现，由于在当时并未出台明确的电子支付行业标准导致各方责任的不明确，而在随后国家陆续出台关于非金融支付机构的网络业务规范中对电子支付的安全性做出了明确规定。 第一，开户审核。支付机构为单位开立支付账户应要求单位提供相关证明文件，并自主或者委托合作机构以面对面方式核实客户身份，或者以非面对面方式通过至少三个合法安全的外部渠道对单位基本信息进行多重交叉验证，并加强对使用个人支付账户开展经营性活动的资金交易监测和持续性客户管理。另外，支付机构在为单位和个人开立支付账户时，应当与单位和个人签订协议，约定支付账户与支付账户、支付账户与银行账户之间的日累计转账限额和笔数，超出限额和笔数的，不得再办理转账业务。 第二，加强账户监测。支付机构应当加强对银行账户和支付账户的监测，建立和完善可疑交易监测模型，账户及其资金划转具有集中转入分散转出等可疑交易特征的，应当列入可疑交易。对于列入可疑交易的账户，支付机构应当与相关单位或者个人核实交易情况；经核实后支付机构仍然认定账户可疑的，支付机构应当暂停账户所有业务，并按照规定报送可疑交易报告或者重点可疑交易报告；涉嫌违法犯罪的，应当及时向当地公安机关报告。 第三，交易验证。支付机构可选择静态密码，经过安全认证的数字证书、电子签名，以及通过安全渠道生成和传输的一次性密码及客户本人指纹等进行交易验证。 第四，确保交易信息真实、完整、可追溯。支付机构与银行合作开展银行账户付款或者收款业务的，应当保存交易渠道、交易终端或接口类型、交易类型、交易金额、交易时间，以及直接向客户提供商品或者服务的特约商户名称、编码和按照国家与金融行业标准设置的商户类别码；收付款客户名称，收付款支付账户账号或者银行账户的开户银行名称及账号；付款客户的身份验证和交易授权信息；有效追溯交易的标识；单位客户单笔超过5万元的转账业务的付款用途和事由等，以确保交易信息的真实性、完整性、可追溯性以及在支付全流程中的一致性。 总之，根据电子支付中可能出现的安全问题，我国已经建立健全了多项安全防护机制的规范文件，但是随着电子支付应用场景的增加，支付机构应逐步完善电子支付风险管理机制、建立电子支付灾难备份机制等，通过创新技术及服务模式以提高整个电子支付系统的安全水平。</p>
+<p>
+<span class="small text-gray">聚点商城</span>
+<span class="small text-gray" title="2018-01-25 00:00:54">2018-01-25</span>
+</p>
+</li>
+<li>
+<h4>
+<a href="../detail/2_1.html"  title="国务院力挺工业互联网 互联网+成新引擎">国务院力挺工业互联网 互联网+成新引擎</a>
+</h4>
+<p class="text-overflow">国务院正式印发《关于深化“互联网+先进制造业”发展工业互联网的指导意见》，提出增强工业互联网产业供给能力，持续提升我国工业互联网发展水平，深入推进“互联网+”，形成实体经济与网络相互促进、同步提升的良好格局，并提出分2025年、2035年和21世纪中叶“三步走”的目标，到2025年，形成3-5家具有国际竞争力的工业互联网平台，实现百万工业APP培育以及百万企业上云。而该意见的发布将对行业产生什么样的影响？ 工业互联网已成为制造业数字化转型的重要方向，亦成为国际国内制造企业和IT巨头竞相抢滩登陆的新市场。11月27日，国务院正式印发《关于深化“互联网+先进制造业”发展工业互联网的指导意见》(下称《意见》)，明确了国内工业互联网的发展目标、主要任务和支持措施。 据中国电子商务研究中心从《意见》中获悉，《意见》提出，中国发展工业互联网的整体目标是构建与经济社会发展相适应的工业互联网生态体系，并提出了分阶段实施目标。到2020年要支持建设一批跨行业、跨领域的国家级平台，以及构建一批企业级平台，培育30万个以上的工业APP即工业应用程序，推动30万家企业应用工业互联网平台；到2025年，形成3-5家具有国际竞争力的工业互联网平台，实现百万工业APP培育以及百万企业上云。 到2035年，建成国际领先的工业互联网网络基础设施和平台，形成国际先进的技术与产业体系；到本世纪中叶，工业互联网网络基础设施全面支撑经济社会发展，工业互联网创新发展能力、技术产业体系以及融合应用等全面达到国际先进水平，综合实力进入世界前列。 《意见》明确了建设和发展工业互联网的主要任务：一是夯实网络基础；二是打造平台体系；三是加强产业支撑；四是促进融合应用；五是完善生态体系；六是提升安全防护能力；七是推动开放合作。其中，网络基础设施的将成为工业互联网建设的重点。工信部信息通信管理局局长韩夏在11月3日举办的国务院政策例行吹风会上解释称，工业互联网包括三大体系：网络、平台和安全。其中网络是基础，能够实现生产全要素的泛在互联及数据的顺畅流通。 《意见》还从6个方面提出工业互联网建设的保障措施。第一，要建立健全法规制度，扩大市场主体平等进入范围，实施包容审慎监管；第二，营造良好市场环境；第三，加大财税支持力度，强化财政资金导向作用；第四，创新金融服务方式，支持扩大直接融资比重；第五，强化专业人才支撑，创新人才使用机制；第六，健全组织实施机制，促进工业互联网与“中国制造2025”协同推进。意见将产生什么影响？     国内产业互联网首倡者、《互联网+：产业风口》畅销书作者、中国电子商务研究中心主任曹磊认为： 观点一：政策力挺工业互联网成为互联网领域下一风口 该意见的出台将加快中国工业互联网的发展，工业互联网对加速我国制造业升级转型、提升工业经济实力大有裨益，其本身的发展也蕴含着巨大的商机，预计到“十三五”末，这一产业的市场规模将突破万亿大关。该意见的出台将为我国工业互联网的发展提供了坚实的保障。当前，工业互联网对中国制造业的影响正在升级，工业大数据被誉为未来的“石油”，工业互联网被公认为互联网领域的下一个风口。我国是工业大国，如果能够依靠互联网等信息技术手段，改变工业的流程、工艺、质量等，转型升级的效果将是巨大的，有助于实现从工业大国到工业强国的提升。扶持和助推工业互联网企业发展，正在成为信息技术为传统制造业转型升级，服务实体经济的重要切入点。 工业互联网通过系统构建网络、平台、安全三大功能体系，打造人、机、物全面互联的新型网络基础设施，形成智能化发展的新兴业态和应用模式，是推进制造强国和网络强国建设的重要基础。工业互联网作为新兴技术在工业领域的应用，实现了不同生产要素的全新组合，发展工业互联网对于我国实体经济的影响是全方位的。考虑到供给侧结构性改革主要集中于工业原材料领域，打造工业互联网平台将全面提升我国制造业的供给能力和质量，而扩大直接融资比重等相关配套措施则有利于实体经济去杠杆进程。 观点二：“互联网+”是驱动制造业强基固本的创新引擎 制造业是立国之本，强国之基。“互联网+”是驱动制造业强基固本的创新引擎，中国制造业自身的传统发展模式和制造业发展面临瓶颈，亟须以创新驱动转型发展。围绕“互联网+”实施创新驱动发展，利用物联网、云计算、大数据等新技术加速制造业升级，实现智能制造、优质制造、网络制造，进而在生产组织方式、商业模式、产业组织和产业体系等方面产生一系列深远的变化。 “互联网+”正在成为驱动制造业转型升级的核心要素。当前，以“信息”为核心的制造范式正在形成，制造体系中数据信息的价值正在不断被挖掘。信息网络技术驱动中国制造业转型战略、路径和支撑体系研究的目标是建设制造强国，途径是实现信息网络技术与制造业的深度融合。</p>
+<p>
+<span class="small text-gray">聚点商城</span>
+<span class="small text-gray" title="2018-01-25 00:00:53">2018-01-25</span>
+</p>
+</li>
+<li>
+<h4>
+<a href="../detail/1_1.html"  title="2018年电商发展5大趋势预测">2018年电商发展5大趋势预测</a>
+</h4>
+<p class="text-overflow">2018年马上就要来了，电商行业也有了几个新的重要发展趋势。下面这5个趋势，卖家需要注意: 一、电商平台影响继续扩大 2018年，电商平台将继续分解零售市场。作为零售商和品牌商的另一个销售渠道，电商平台变得越来有重要。 然而，并不是每个零售商或品牌都会在平台上成功。对于那些想要把控客户体验和定价的零售商来说，平台销售可能无法像自有渠道那样把控各个环节。平台销售容易掀起价格战，导致利润率下降，价格策略失去控制。另外，平台假货问题难以根除。 为了取得成功，零售商必须摸索出大型平台(比如eBay和亚马逊)与垂直平台之间的差异。 二、大数据将改变客户体验 收集有价值的客户数据，是提高营收和优化客户体验的重要方式。这也能增加消费者和零售商/品牌之间的互动，从而加强消费者忠诚度和粘性。 随着电商平台的影响力变大，零售商需要充分了解客户群，以更好地利用机会。成功不再仅仅是提供最便宜的价格。 三、跨境电商将变得更具吸引力 技术创新和更高效的物流，将继续推动2018年跨境电商的发展。据eMarketer称，2018年亚洲电商市场交易额预计将达到1.8万亿美元，占全球零售电商市场的60%。 为了取得成功，零售商将越来越多地关注近岸仓储解决方案，以更高的效率和更快的交货速度改善客户体验。 四、物流将被重新定义 不断变化的消费者期望正在推动零售商和品牌重新定义物流。随着亚马逊不断发展，更高的物流标准也正在产生。如果零售商能够更好预测需求、及时配送产品，那么他们的竞争优势才会更大，也就更受消费者喜爱。 五、全渠道战略仍然很重要 成本上涨迫使电商零售商通过实体店寻找新的机会。另一方面，实体店零售商正在逐步拓展线上渠道。全渠道零售继续为在线和实体零售创造协同效应。 这不仅能帮助零售商更好地了解客户，还将确保他们的产品和服务在所有渠道中销售。即使在市场竞争加剧的情况下，这也会使他们的业务取得成功。</p>
+<p>
+<span class="small text-gray">聚点商城</span>
+<span class="small text-gray" title="2018-01-25 00:00:52">2018-01-25</span>
+</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<footer class="main-footer">
+<div class="container">
+<div class="promise">
+<div class="row">
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-roundcheck"></i>
+</div>
+<div class="pull-left">
+<strong>品质保障</strong>
+<p>品质护航 购物无忧</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-time"></i>
+</div>
+<div class="pull-left">
+<strong>极速物流</strong>
+<p>多仓直发 极速配送</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-like"></i>
+</div>
+<div class="pull-left">
+<strong>售后无忧</strong>
+<p>退换无忧 维修无忧</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-goodsfavor"></i>
+</div>
+<div class="pull-left">
+<strong>天天低价</strong>
+<p>天天低价 帮您省钱</p>
+</div>
+</div>
+</div>
+</div>
+<div class="row">
+<div class="col-xs-4">
+<ul class="contact">
+<li>
+<i class="iconfont icon-phone"></i>
+<strong>020-89855351 </strong>
+</li>
+
+<li>
+<i class="iconfont icon-location"></i>
+广东省广州市黄埔区大沙地东319号保利中誉广场2607室
+</li>
+</ul>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>购物指南</dt>
+<dd>
+<a href="../detail/16_1.html" >免费注册</a>
+</dd>
+<dd>
+<a href="../detail/15_1.html" >购物流程</a>
+</dd>
+<dd>
+<a href="../detail/17_1.html" >会员等级</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>支付方式</dt>
+<dd>
+<a href="../detail/19_1.html" >货到付款</a>
+</dd>
+<dd>
+<a href="../detail/20_1.html" >网银支付</a>
+</dd>
+<dd>
+<a href="../detail/21_1.html" >银行转帐</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>售后服务</dt>
+<dd>
+<a href="../detail/31_1.html" >退换货政策</a>
+</dd>
+<dd>
+<a href="../detail/33_1.html" >退换货申请</a>
+</dd>
+<dd>
+<a href="../detail/34_1.html" >退款说明</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>商家服务</dt>
+<dd>
+<a href="../detail/36_1.html" >商家入驻</a>
+</dd>
+<dd>
+<a href="../detail/37_1.html" >商家帮助</a>
+</dd>
+<dd>
+<a href="../detail/38_1.html" >运营服务</a>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+<div class="bottom-nav">
+<ul class="clearfix">
+<li>
+<a href="/article/detail/39_1.html" >隐私政策</a>
+|
+</li>
+<li>
+<a href="/article/detail/39_1.html" >法律声明</a>
+|
+</li>
+<li>
+<a href="/article/detail/37_1.html" >客户服务</a>
+
+</li>
+
+</ul>
+<p><a href="http://www.beian.miit.gov.cn/" class="colorD" target="_blank" rel="noopener noreferrer">Copyright©2020. 广州众咖信息科技服务有限公司 All Rights Reserved 粤ICP备18042113号-2</a></p>
+</div>
+</footer></body>
+</html>

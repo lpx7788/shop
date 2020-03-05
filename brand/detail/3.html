@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="聚点商城 Team">
+<meta name="copyright" content="聚点商城">
+<meta name="keywords" content="三星">
+<meta name="description" content="三星">
+<title>三星 - 聚点商城</title>
+<link href="/favicon.ico" rel="icon">
+<link href="/resources/common/css/bootstrap.css"  rel="stylesheet">
+<link href="/resources/common/css/iconfont.css"  rel="stylesheet">
+<link href="/resources/common/css/base.css"  rel="stylesheet">
+<link href="/resources/shop/css/base.css"  rel="stylesheet">
+<link href="/resources/shop/css/product.css"  rel="stylesheet">
+<link href="/resources/shop/css/brand.css"  rel="stylesheet">
+<link href="/resources/common/css/new/backup.css"  rel="stylesheet">
+<script src="/resources/common/js/new/jquery.min.js"></script>
+<script src="/resources/common/js/new/bootstrap.min.js"></script></script>
+<script src="/resources/common/js/jquery.lazyload.js" ></script>
+<script src="/resources/common/js/jquery.qrcode.js" ></script>
+<script src="/resources/common/js/lodash.js" ></script>
+<script src="/resources/common/js/new/URI.min.js"></script>
+<script src="/resources/common/js/new/velocity.min.js"></script>
+<script src="/resources/common/js/new/velocity.ui.min.js"></script>
+<script src="/resources/common/js/base.js" ></script>
+<script src="/resources/shop/js/base.js" ></script>
+</head>
+<body class="shop brand-detail">
+<script id="mainHeaderMemberInfoTemplate" type="text/template">
+	<%if (localStorage.getItem('username') != ''&&localStorage.getItem('username') != null) {%>
+		<ul class="list-inline">
+			<li>
+				<a><%-localStorage.getItem('username')%></a>
+			</li>
+			<li>
+				<a class="logout" href="/index.html">退出</a>
+			</li>
+		</ul>
+	<%} else {%>
+		<ul class="list-inline">
+			<li>
+				<a href="/member/login.html">登录</a>
+			</li>
+			<li>
+				<a href="/member/register.html">注册</a>
+			</li>
+		</ul>
+	<%}%>
+</script>
+<script id="mainHeaderCartDetailTemplate" type="text/template">
+	<%if (!_.isEmpty(cart.cartItems)) {%>
+		<div class="cart-detail-body">
+			<ul>
+				<%_.each(cart.cartItems, function(cartItem, i) {%>
+					<li>
+						<a href="<%-cartItem.skuPath%>">
+							<img src="<%-cartItem.skuThumbnail%>" alt="<%-cartItem.skuName%>">
+							<span class="text-overflow" title="<%-cartItem.skuName%>"><%-cartItem.skuName%></span>
+						</a>
+						<span>
+							<strong><%-$.currency(cartItem.price, true, false)%></strong>
+							&times; <%-cartItem.quantity%>
+						</span>
+					</li>
+				<%});%>
+			</ul>
+		</div>
+		<div class="cart-detail-footer">
+			共计:
+			<strong><%-$.currency(cart.effectivePrice, true, true)%></strong>
+			<a class="pull-right" href="../../cart/list.html">商品结算</a>
+		</div>
+	<%} else {%>
+		<p>您的购物车是空的，请去挑选您的商品！</p>
+	<%}%>
+</script>
+<script>
+		$().ready(function() {
+
+			var $document = $(document);
+			var $mainHeaderTopAd = $("#mainHeaderTopAd");
+			var $mainHeaderTopAdClose = $("#mainHeaderTopAd button.close");
+			var $mainHeaderMemberInfo = $("#mainHeaderMemberInfo");
+			var $mainHeaderProductSearchForm = $("#mainHeaderProductSearch form");
+			var $searchType = $("#mainHeaderProductSearch [data-search-type]");
+			var $mainHeaderProductSearchKeyword = $("#mainHeaderProductSearch input[name='keyword']");
+			var $mainHeaderCart = $("#mainHeaderCart");
+			var $mainHeaderCartQuantity = $("#mainHeaderCart em");
+			var $mainHeaderCartDetail = $("#mainHeaderCart div.cart-detail");
+			var $mainHeaderMainNavInkBar = $("#mainHeaderMainNav div.ink-bar");
+			var $mainHeaderMainNavItem = $("#mainHeaderMainNav li");
+			var $mainHeaderMainNavActiveItem = $("#mainHeaderMainNav li.active");
+			var mainHeaderMemberInfoTemplate = _.template($("#mainHeaderMemberInfoTemplate").html());
+			var mainHeaderCartDetailTemplate = _.template($("#mainHeaderCartDetailTemplate").html());
+
+			// 顶部广告
+			if (sessionStorage.getItem("mainHeaderTopAdHidden") == null) {
+				$mainHeaderTopAd.show();
+			}
+
+			// 顶部广告
+			$mainHeaderTopAdClose.click(function() {
+				sessionStorage.setItem("mainHeaderTopAdHidden", "true");
+				$mainHeaderTopAd.velocity("slideUp");
+			});
+
+			// 会员信息
+			$mainHeaderMemberInfo.html(mainHeaderMemberInfoTemplate({
+				currentUser: $.getCurrentUser()
+			}));
+
+			// 用户注销
+			$mainHeaderMemberInfo.on("click", "a.logout", function() {
+				localStorage.setItem('username','')
+				localStorage.setItem('authority','')
+				localStorage.setItem('token','')
+				let cartDatas = JSON.parse(localStorage.getItem('cartDatas'))
+				cartDatas.cartItems = []
+				localStorage.setItem('cartDatas',JSON.stringify(cartDatas))
+				window.location.href=document.referrer;
+                $document.trigger("loggedOut.shopxx.user", $.getCurrentUser());
+			});
+
+			// 搜索类型
+			$searchType.click(function() {
+				var $element = $(this);
+				var searchType = $element.data("search-type");
+
+				$element.closest("div.input-group").find("[data-toggle='dropdown'] span:not(.caret)").text($element.text());
+
+				switch (searchType) {
+					case "product":
+						$mainHeaderProductSearchForm.attr("action", "/product/search.html");
+						break;
+					case "store":
+						$mainHeaderProductSearchForm.attr("action", "/store/search.html");
+						break;
+				}
+			});
+
+			// 商品搜索
+			$mainHeaderProductSearchForm.submit(function() {
+				if ($.trim($mainHeaderProductSearchKeyword.val()) === "") {
+					return false;
+				}
+			});
+
+			// 购物车
+				// 购物车
+			$mainHeaderCart.hover(function() {
+				var loading = true;
+
+				setTimeout(function() {
+					if (loading) {
+						$mainHeaderCartDetail.html('<div class="cart-loader"><span></span><span></span><span></span><span></span><span></span></div>');
+					}
+				}, 500);
+				let data = $.getCurrentCart()
+
+					loading = false;
+					$mainHeaderCartDetail.html(mainHeaderCartDetailTemplate({
+						cart: data
+					}));
+
+			});
+
+			// 购物车数量
+			var currentCartQuantity = $.getCurrentCartQuantity();
+			if (currentCartQuantity != null) {
+				$mainHeaderCartQuantity.text(currentCartQuantity < 100 ? currentCartQuantity : "99+");
+			}
+
+			// 购物车数量
+			$document.on("complete.shopxx.setCurrentCartQuantity", function(event, quantity) {
+				$mainHeaderCartQuantity.text(quantity < 100 ? quantity : "99+");
+			});
+
+			// 主导航
+			if ($mainHeaderMainNavItem.length > 0) {
+				if ($mainHeaderMainNavActiveItem.length < 1) {
+					$mainHeaderMainNavActiveItem = $mainHeaderMainNavItem.first();
+				}
+
+				$mainHeaderMainNavInkBar.css({
+					width: $mainHeaderMainNavActiveItem.outerWidth(),
+					display: "block",
+					left: $mainHeaderMainNavActiveItem.position().left
+				});
+
+				$mainHeaderMainNavItem.hover(function() {
+					var $element = $(this);
+
+					$mainHeaderMainNavInkBar.css({
+						width: $element.outerWidth(),
+						left: $element.position().left
+					});
+				}, function() {
+					$mainHeaderMainNavInkBar.css({
+						width: $mainHeaderMainNavActiveItem.outerWidth(),
+						left: $mainHeaderMainNavActiveItem.position().left
+					});
+				});
+			}
+
+		});
+		</script>
+<header class="main-header">
+<div id="mainHeaderTopAd" class="top-ad">
+<button class="close" type="button">
+<span>&times;</span>
+</button>
+<a href="/product/detail/51.html"  target="blank">
+<img src="/images/cc976454-1494-43de-96a8-fda391c880a9.jpg"  alt="空调0元安装放心购">
+</a>
+</div>
+<div class="top-nav">
+<div class="container">
+<div class="row">
+<div class="col-xs-12">
+<div id="mainHeaderMemberInfo" class="pull-left"></div>
+<ul class="list-inline pull-right">
+<li>
+<a href="/member/login.html" >会员中心</a>
+</li>
+<li>
+<a href="../../member/order/list.html" >我的订单</a>
+</li>
+<li class="top-nav-dropdown">
+<a href="javascript:;">
+商家服务
+<span class="caret"></span>
+</a>
+<ul class="business">
+<li>
+<a href="../../business/login-redirectUrl=-business-index.html"  target="_blank" rel="noopener noreferrer">商家中心</a>
+</li>
+<li>
+<a href="../../business/register.html" >商家入驻</a>
+</li>
+</ul>
+</li>
+
+
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="container">
+<div class="row">
+<div class="col-xs-3 logo-container" >
+    <a>
+        <img  class="logo-img" src="/images/logo.png"  alt="聚点商城">
+        <div class="logo-text" >
+            <h3>聚点商城</h3>
+        </div>
+    </a>
+</div>
+<div class="col-xs-6">
+<p class="empty-header-center-block"></p>
+</div>
+<div class="col-xs-3">
+
+</div>
+</div>
+<div class="row">
+<div class="col-xs-2">
+<a class="product-category" href="../../product_category.html" >
+<i class="iconfont icon-sort"></i>
+所有商品分类
+</a>
+</div>
+<div class="col-xs-10">
+<div id="mainHeaderMainNav" class="main-nav">
+<div class="ink-bar"></div>
+<ul>
+<li>
+<a href="../../index.html" >首页</a>
+</li>
+<li>
+<a href="../../product/list/1.html" >手机数码</a>
+</li>
+<li>
+<a href="../../product/list/2.html" >办公家电</a>
+</li>
+<li>
+<a href="../../product/list/3.html" >精品服饰</a>
+</li>
+<li>
+<a href="../../product/list/4.html" >珠宝饰品</a>
+</li>
+<li>
+<a href="../../product/list/5.html" >美妆护肤</a>
+</li>
+
+<li>
+<a href="../../product/list-type=EXCHANGE.html" >积分商城</a>
+</li>
+<li>
+<a href="../../product/list-promotionPluginId=groupBuyingPromotionPlugin.html" >团购商城</a>
+</li>
+<li>
+<a href="../../article/list/1.html" >商城动态</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</header><script id="historyProductTemplate" type="text/template">
+	<h4>
+		浏览记录
+		<%if (!_.isEmpty(data)) {%>
+			<a class="clear pull-right" href="javascript:;">清空</a>
+		<%}%>
+	</h4>
+	<%if (!_.isEmpty(data)) {%>
+		<ul class="clearfix">
+			<%_.each(data, function(product, i) {%>
+				<li>
+					<a href="<%-product.path%>" target="_blank" rel="noopener noreferrer">
+						<img class="img-responsive center-block" src="<%-product.thumbnail != null ? product.thumbnail : "/images/default_thumbnail_product_image.png"%>" alt="<%-product.name%>">
+						<h5 class="text-overflow" title="<%-product.name%>"><%-product.name%></h5>
+					</a>
+				</li>
+			<%});%>
+		</ul>
+	<%} else {%>
+		<p>暂无信息</p>
+	<%}%>
+</script>
+<script>
+			$().ready(function() {
+
+				var $window = $(window);
+				var $document = $(document);
+				var $body = $("body");
+				var $mainSidebar = $("#mainSidebar");
+				var $mainSidebarCartQuantity = $("#mainSidebarCart em");
+				var $mainSidebarTooltipToggle = $("#mainSidebar [data-toggle='tooltip']");
+				var $historyProductCollapse = $("#historyProductCollapse");
+				var $mainSidebarQrcodeContent = $("#mainSidebarQrcode div.content");
+				var $mainSidebarBackTop = $("#mainSidebarBackTop");
+				var $mainSidebarHistoryProduct = $("#mainSidebarHistoryProduct");
+				var mainSidebarBackTopHidden = true;
+				var mainSidebarExpanded = false;
+				var historyProductTemplate = _.template($("#historyProductTemplate").html());
+				var historyProductIdsLocalStorageKey = "historyProductIds";
+
+				// 购物车数量
+				var currentCartQuantity = $.getCurrentCartQuantity();
+
+				if (currentCartQuantity != null) {
+					$mainSidebarCartQuantity.text(currentCartQuantity < 100 ? currentCartQuantity : "99+");
+				}
+
+				// 购物车数量
+				$document.on("complete.shopxx.setCurrentCartQuantity", function(event, quantity) {
+					$mainSidebarCartQuantity.text(quantity < 100 ? quantity : "99+");
+				});
+
+				// 提示
+				$mainSidebarTooltipToggle.tooltip();
+
+				// 浏览记录展开/折叠
+					// $document.on("click", function(e) {
+				// 	if ($mainSidebar.data("collapse-disabled") === "true") {
+				// 		return;
+				// 	}
+				// 	if ($historyProductCollapse[0] === e.target || $.contains($historyProductCollapse[0], e.target) || (mainSidebarExpanded && !$.contains($mainSidebar[0], e.target))) {
+				// 		$mainSidebar.velocity({
+				// 			right: mainSidebarExpanded ? -300 : 0
+				// 		}, {
+				// 			begin: function() {
+				// 				$mainSidebar.data("collapse-disabled", "true");
+				// 				if (!mainSidebarExpanded) {
+				// 					loadHistoryProduct();
+				// 				}
+				// 			},
+				// 			complete: function() {
+				// 				$mainSidebar.removeData("collapse-disabled");
+				// 				mainSidebarExpanded = !mainSidebarExpanded;
+				// 			}
+				// 		}, 500);
+				// 	}
+				// });
+
+				// 加载浏览记录
+				function loadHistoryProduct() {
+					var historyProductIdsLocalStorage = localStorage.getItem(historyProductIdsLocalStorageKey);
+					var historyProductIds = historyProductIdsLocalStorage != null ? JSON.parse(historyProductIdsLocalStorage) : [];
+
+					$.get("/product/history", {
+						productIds: historyProductIds
+					}).done(function(data) {
+						localStorage.setItem(historyProductIdsLocalStorageKey, JSON.stringify($.map(data, function(item) {
+							return item.id
+						})));
+						$mainSidebarHistoryProduct.html(historyProductTemplate({
+							data: data
+						}));
+					});
+				}
+
+				// 清空浏览记录
+				$mainSidebarHistoryProduct.on("click", ".clear", function() {
+					localStorage.removeItem(historyProductIdsLocalStorageKey);
+					$mainSidebarHistoryProduct.html(historyProductTemplate({
+						data: {}
+					}));
+					return false;
+				});
+
+				// 二维码
+				$mainSidebarQrcodeContent.qrcode({
+					width: 100,
+					height: 100,
+					text: location.href
+				});
+
+				// 返回顶部
+				$window.scroll(_.throttle(function() {
+					if ($window.scrollTop() > 500) {
+						if (mainSidebarBackTopHidden) {
+							mainSidebarBackTopHidden = false;
+							$mainSidebarBackTop.velocity("fadeIn");
+						}
+					} else {
+						if (!mainSidebarBackTopHidden) {
+							mainSidebarBackTopHidden = true;
+							$mainSidebarBackTop.velocity("fadeOut");
+						}
+					}
+				}, 500));
+
+				// 返回顶部
+				$mainSidebarBackTop.click(function() {
+					$body.velocity("stop").velocity("scroll", {
+						duration: 1000
+					});
+				});
+
+			});
+		</script>
+<aside id="mainSidebar" class="main-sidebar clearfix">
+<div class="main-sidebar-body">
+<ul>
+<li>
+<a id="mainSidebarCart" class="cart" href="../../cart/list.html" >
+<i class="iconfont icon-cart"></i>
+<span>购物车</span>
+<em>0</em>
+</a>
+</li>
+<li>
+<a href="../../member/order/list.html"  title="我的订单" data-toggle="tooltip" data-placement="left">
+<i class="iconfont icon-form"></i>
+</a>
+</li>
+
+<li>
+<a href="/member/product_favorite/list.html"  title="我的收藏" data-toggle="tooltip" data-placement="left">
+<i class="iconfont icon-like"></i>
+</a>
+</li>
+<li>
+<a href="../..//member/coupon_code/list.html"  title="优惠券" data-toggle="tooltip" data-placement="left">
+<i class="iconfont icon-ticket"></i>
+</a>
+</li>
+<li>
+
+</li>
+</ul>
+<a id="mainSidebarBackTop" class="back-top" href="javascript:;" title="返回顶部">
+<i class="iconfont icon-top"></i>
+</a>
+</div>
+<div class="main-sidebar-right">
+<div id="mainSidebarHistoryProduct" class="history-product"></div>
+</div>
+</aside> <main>
+<div class="container">
+<div class="row">
+<div class="col-xs-2">
+<div class="featured-product">
+<div class="featured-product-heading">
+<h4>推荐商品</h4>
+</div>
+<div class="featured-product-body">
+<ul>
+<li>
+<a href="../../product/detail/1.html"  target="_blank" rel="noopener noreferrer">
+<img class="lazy-load img-responsive center-block" src="../../resources/common/images/transparent.png"  alt="KOOLIFE 畅玩5C钢化膜" data-original="/images/c719c026-b516-4134-b2c5-6aa4b9a162d0_thumbnail.jpg">
+</a>
+<strong>
+￥0.00
+<del>￥0.00</del>
+</strong>
+<a href="../../product/detail/1.html"  target="_blank" rel="noopener noreferrer">
+<h5 class="text-overflow" title="KOOLIFE 畅玩5C钢化膜">KOOLIFE 畅玩5C钢化膜</h5>
+<h6 class="text-overflow" title="高清高透，视觉享受">高清高透，视觉享受</h6>
+</a>
+</li>
+<li>
+<a href="../../product/detail/2.html"  target="_blank" rel="noopener noreferrer">
+<img class="lazy-load img-responsive center-block" src="../../resources/common/images/transparent.png"  alt="KOLA 红米Note4全屏钢化膜" data-original="/images/0e6c5bd5-af70-45f6-a68a-7d48b8486ad9_thumbnail.jpg">
+</a>
+<strong>
+￥0.00
+<del>￥0.00</del>
+</strong>
+<a href="../../product/detail/2.html"  target="_blank" rel="noopener noreferrer">
+<h5 class="text-overflow" title="KOLA 红米Note4全屏钢化膜">KOLA 红米Note4全屏钢化膜</h5>
+<h6 class="text-overflow" title="五重护甲，精密保护">五重护甲，精密保护</h6>
+</a>
+</li>
+<li>
+<a href="../../product/detail/3.html"  target="_blank" rel="noopener noreferrer">
+<img class="lazy-load img-responsive center-block" src="../../resources/common/images/transparent.png"  alt="派滋 小米5钢化膜" data-original="/images/a99eb76c-a1a5-451d-85b1-8bb55b93fa77_thumbnail.jpg">
+</a>
+<strong>
+￥0.00
+<del>￥0.00</del>
+</strong>
+<a href="../../product/detail/3.html"  target="_blank" rel="noopener noreferrer">
+<h5 class="text-overflow" title="派滋 小米5钢化膜">派滋 小米5钢化膜</h5>
+<h6 class="text-overflow" title="开启全屏时代">开启全屏时代</h6>
+</a>
+</li>
+<li>
+<a href="../../product/detail/4.html"  target="_blank" rel="noopener noreferrer">
+<img class="lazy-load img-responsive center-block" src="../../resources/common/images/transparent.png"  alt="莫凡(Mofi) 华为畅享6S钢化膜" data-original="/images/2b61d366-9ff9-4e1b-b99c-f9fd7c4c4908_thumbnail.jpg">
+</a>
+<strong>
+￥0.00
+<del>￥0.00</del>
+</strong>
+<a href="../../product/detail/4.html"  target="_blank" rel="noopener noreferrer">
+<h5 class="text-overflow" title="莫凡(Mofi) 华为畅享6S钢化膜">莫凡(Mofi) 华为畅享6S钢化膜</h5>
+<h6 class="text-overflow" title="高清防爆，耐磨防刮">高清防爆，耐磨防刮</h6>
+</a>
+</li>
+<li>
+<a href="../../product/detail/5.html"  target="_blank" rel="noopener noreferrer">
+<img class="lazy-load img-responsive center-block" src="../../resources/common/images/transparent.png"  alt="奥多金 华为Nova全屏覆盖钢化玻璃膜" data-original="/images/f287662b-3f86-43ac-bf71-df5db2b97b65_thumbnail.jpg">
+</a>
+<strong>
+￥0.00
+<del>￥0.00</del>
+</strong>
+<a href="../../product/detail/5.html"  target="_blank" rel="noopener noreferrer">
+<h5 class="text-overflow" title="奥多金 华为Nova全屏覆盖钢化玻璃膜">奥多金 华为Nova全屏覆盖钢化玻璃膜</h5>
+<h6 class="text-overflow" title="钢化完整，安全可靠">钢化完整，安全可靠</h6>
+</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="col-xs-10">
+<ol class="breadcrumb">
+<li>
+<a href="../../index.html" >
+<i class="iconfont icon-homefill"></i>
+首页
+</a>
+</li>
+<li>
+<a href="../list/1.html" >品牌</a>
+</li>
+<li class="active">三星</li>
+</ol>
+<div class="detail">
+<div class="media">
+<div class="media-left media-middle">
+<a   target="_blank" rel="noopener noreferrer">
+<img src="/images/d2f3d6d1-02fd-4f04-9329-f180e12885e7.png"  alt="三星">
+</a>
+</div>
+<div class="media-body media-middle">
+<h5 class="media-heading" title="三星">三星</h5>
+<a   target="_blank" rel="noopener noreferrer">http://www.samsung.com</a>
+</div>
+</div>
+<div class="brand-introduction"><p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 三星集团是韩国最大的跨国企业集团，同时也是上市企业全球500强，三星集团包括众多的国际下属企业，旗下子公司有：三星电子、三星物产、三星航空、三星人寿保险等，业务涉及电子、金融、机械、化学等众多领域。<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 三星集团成立于1938年，由李秉喆创办。三星集团是家族企业，李氏家族世袭，旗下各个三星产业均为家族产业，并由家族中的其他成员管理，集团领导人已传至 李氏第三代，李健熙为现任集团会长，其子李在镕任三星电子副会长。<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 2016年5月25日，华为公司在美国和中国提起对三星公司的知识产权诉讼，包括加州北区法院和深圳中级人民法院。7月21日，三星在北京知识产权法院起诉华为技术有限公司专利侵权，停止生产、销售mate8等机型，索赔8050万。9月6日，据道琼斯消息，在已出货或到达消费者手中的约250万部Note 7手机中，有70%电池为由子公司：三星SDI(SAMSUNG SDI CO.,LTD.)供应，剩下的部分则采用了中国新能源科技有限公司(ATL)的电池。10月，三星集团排2016年全球100大最有价值品牌第7名。10月，三星电子在召回Galaxy Note 7手机后又宣布停止销售该手机，几乎宣布了这款旗舰手机的“死刑”，此举或令三星损失170亿美元 。12月9日，三星准备在美国升级软件，永久禁用Galaxy Note7手机。 <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 2016年11月4日晚间消息，三星电子美国公司宣布，将主动召回280万台特定型号的顶部开盖洗衣机。<br></p></div>
+<div class="related-product">
+<div class="related-product-heading">
+<h5>相关商品</h5>
+</div>
+<div class="related-product-body">
+<ul class="clearfix">
+<li>
+<a href="../../product/detail/43.html"  target="_blank" rel="noopener noreferrer">
+<img class="lazy-load img-responsive center-block" src="../../resources/common/images/transparent.png"  alt="三星(SAMSUNG) UA55KS7300JXXZ电视" data-original="/images/218c5c93-8ade-4040-ad4c-31dd12c8ddd0_thumbnail.jpg">
+</a>
+<strong>
+￥8490.00
+<del>￥10188.00</del>
+</strong>
+<a href="../../product/detail/43.html"  target="_blank" rel="noopener noreferrer">
+<h5 class="text-overflow" title="三星(SAMSUNG) UA55KS7300JXXZ电视">三星(SAMSUNG) UA55KS7300JXXZ电视</h5>
+<h6 class="text-overflow" title="超高清，量子点，HDR">超高清，量子点，HDR</h6>
+</a>
+</li>
+<li>
+<a href="../../product/detail/20.html"  target="_blank" rel="noopener noreferrer">
+<img class="lazy-load img-responsive center-block" src="../../resources/common/images/transparent.png"  alt="三星(SAMSUNG) Galaxy S6" data-original="/images/f14f32ca-9666-4824-8ca3-570cc167c222_thumbnail.jpg">
+</a>
+<strong>
+￥2499.00
+<del>￥2998.80</del>
+</strong>
+<a href="../../product/detail/20.html"  target="_blank" rel="noopener noreferrer">
+<h5 class="text-overflow" title="三星(SAMSUNG) Galaxy S6">三星(SAMSUNG) Galaxy S6</h5>
+<h6 class="text-overflow" title="讲述光和影的故事">讲述光和影的故事</h6>
+</a>
+</li>
+<li>
+<a href="../../product/detail/19.html"  target="_blank" rel="noopener noreferrer">
+<img class="lazy-load img-responsive center-block" src="../../resources/common/images/transparent.png"  alt="三星(SAMSUNG) Galaxy On5" data-original="/images/ed5e6a7b-ebb3-4f1a-b29b-243fdacdaff0_thumbnail.jpg">
+</a>
+<strong>
+￥1229.00
+<del>￥1474.80</del>
+</strong>
+<a href="../../product/detail/19.html"  target="_blank" rel="noopener noreferrer">
+<h5 class="text-overflow" title="三星(SAMSUNG) Galaxy On5">三星(SAMSUNG) Galaxy On5</h5>
+<h6 class="text-overflow" title="金属机身质感好">金属机身质感好</h6>
+</a>
+</li>
+<li>
+<a href="../../product/detail/18.html"  target="_blank" rel="noopener noreferrer">
+<img class="lazy-load img-responsive center-block" src="../../resources/common/images/transparent.png"  alt="三星(SAMSUNG) Galaxy J3" data-original="/images/39860353-fdfe-4ea2-870f-4958370f8355_thumbnail.jpg">
+</a>
+<strong>
+￥1099.00
+<del>￥1318.80</del>
+</strong>
+<a href="../../product/detail/18.html"  target="_blank" rel="noopener noreferrer">
+<h5 class="text-overflow" title="三星(SAMSUNG) Galaxy J3">三星(SAMSUNG) Galaxy J3</h5>
+<h6 class="text-overflow" title="美拍够亮够靓">美拍够亮够靓</h6>
+</a>
+</li>
+<li>
+<a href="../../product/detail/17.html"  target="_blank" rel="noopener noreferrer">
+<img class="lazy-load img-responsive center-block" src="../../resources/common/images/transparent.png"  alt="三星(SAMSUNG) Galaxy C7 Pro" data-original="/images/aad976aa-ad0d-41f4-a59b-04f453031150_thumbnail.jpg">
+</a>
+<strong>
+￥1978.00
+<del>￥2373.60</del>
+</strong>
+<a href="../../product/detail/17.html"  target="_blank" rel="noopener noreferrer">
+<h5 class="text-overflow" title="三星(SAMSUNG) Galaxy C7 Pro">三星(SAMSUNG) Galaxy C7 Pro</h5>
+<h6 class="text-overflow" title="让你爱上拍照">让你爱上拍照</h6>
+</a>
+</li>
+<li>
+<a href="../../product/detail/16.html"  target="_blank" rel="noopener noreferrer">
+<img class="lazy-load img-responsive center-block" src="../../resources/common/images/transparent.png"  alt="三星(SAMSUNG) Galaxy C5 Pro" data-original="/images/4f06875c-b6b2-4900-a800-300af38197ce_thumbnail.jpg">
+</a>
+<strong>
+￥1588.00
+<del>￥1905.60</del>
+</strong>
+<a href="../../product/detail/16.html"  target="_blank" rel="noopener noreferrer">
+<h5 class="text-overflow" title="三星(SAMSUNG) Galaxy C5 Pro">三星(SAMSUNG) Galaxy C5 Pro</h5>
+<h6 class="text-overflow" title="大光圈，亮颜美颜自拍功能">大光圈，亮颜美颜自拍功能</h6>
+</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<footer class="main-footer">
+<div class="container">
+<div class="promise">
+<div class="row">
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-roundcheck"></i>
+</div>
+<div class="pull-left">
+<strong>品质保障</strong>
+<p>品质护航 购物无忧</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-time"></i>
+</div>
+<div class="pull-left">
+<strong>极速物流</strong>
+<p>多仓直发 极速配送</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-like"></i>
+</div>
+<div class="pull-left">
+<strong>售后无忧</strong>
+<p>退换无忧 维修无忧</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-goodsfavor"></i>
+</div>
+<div class="pull-left">
+<strong>天天低价</strong>
+<p>天天低价 帮您省钱</p>
+</div>
+</div>
+</div>
+</div>
+<div class="row">
+<div class="col-xs-4">
+<ul class="contact">
+<li>
+<i class="iconfont icon-phone"></i>
+<strong>020-89855351 </strong>
+</li>
+
+<li>
+<i class="iconfont icon-location"></i>
+广东省广州市黄埔区大沙地东319号保利中誉广场2607室
+</li>
+</ul>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>购物指南</dt>
+<dd>
+<a href="../../article/detail/16_1.html" >免费注册</a>
+</dd>
+<dd>
+<a href="../../article/detail/15_1.html" >购物流程</a>
+</dd>
+<dd>
+<a href="../../article/detail/17_1.html" >会员等级</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>支付方式</dt>
+<dd>
+<a href="../../article/detail/19_1.html" >货到付款</a>
+</dd>
+<dd>
+<a href="../../article/detail/20_1.html" >网银支付</a>
+</dd>
+<dd>
+<a href="../../article/detail/21_1.html" >银行转帐</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>售后服务</dt>
+<dd>
+<a href="../../article/detail/31_1.html" >退换货政策</a>
+</dd>
+<dd>
+<a href="../../article/detail/33_1.html" >退换货申请</a>
+</dd>
+<dd>
+<a href="../../article/detail/34_1.html" >退款说明</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>商家服务</dt>
+<dd>
+<a href="../../article/detail/36_1.html" >商家入驻</a>
+</dd>
+<dd>
+<a href="../../article/detail/37_1.html" >商家帮助</a>
+</dd>
+<dd>
+<a href="../../article/detail/38_1.html" >运营服务</a>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+<div class="bottom-nav">
+<ul class="clearfix">
+<li>
+<a href="/article/detail/39_1.html" >隐私政策</a>
+|
+</li>
+<li>
+<a href="/article/detail/39_1.html" >法律声明</a>
+|
+</li>
+<li>
+<a href="/article/detail/37_1.html" >客户服务</a>
+
+</li>
+
+</ul>
+<p><a href="http://www.beian.miit.gov.cn/" class="colorD" target="_blank" rel="noopener noreferrer">Copyright©2020. 广州众咖信息科技服务有限公司 All Rights Reserved 粤ICP备18042113号-2</a></p>
+</div>
+</footer></body>
+</html>

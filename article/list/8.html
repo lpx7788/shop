@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="聚点商城 Team">
+<meta name="copyright" content="聚点商城">
+<meta name="keywords" content="商家服务">
+<meta name="description" content="商家服务">
+<title>商家服务 - 聚点商城</title>
+<link href="/favicon.ico" rel="icon">
+<link href="/resources/common/css/bootstrap.css"  rel="stylesheet">
+<link href="/resources/common/css/font-awesome.css"  rel="stylesheet">
+<link href="/resources/common/css/iconfont.css"  rel="stylesheet">
+<link href="/resources/common/css/base.css"  rel="stylesheet">
+<link href="/resources/shop/css/base.css"  rel="stylesheet">
+<link href="/resources/shop/css/article.css"  rel="stylesheet">
+<link href="/resources/common/css/new/backup.css"  rel="stylesheet">
+<script src="/resources/common/js/new/jquery.min.js"></script>
+<script src="/resources/common/js/new/bootstrap.min.js"></script></script>
+<script src="/resources/common/js/new/jquery.bootstrap-growl.min.js"></script>
+<script src="/resources/common/js/jquery.cookie.js" ></script>
+<script src="/resources/common/js/jquery.qrcode.js" ></script>
+<script src="/resources/common/js/lodash.js" ></script>
+<script src="/resources/common/js/new/URI.min.js"></script>
+<script src="/resources/common/js/new/velocity.min.js"></script>
+<script src="/resources/common/js/new/velocity.ui.min.js"></script>
+<script src="/resources/common/js/base.js" ></script>
+<script src="/resources/shop/js/base.js" ></script>
+</head>
+<body class="shop article-list">
+<script id="mainHeaderMemberInfoTemplate" type="text/template">
+	<%if (localStorage.getItem('username') != ''&&localStorage.getItem('username') != null) {%>
+		<ul class="list-inline">
+			<li>
+				<a><%-localStorage.getItem('username')%></a>
+			</li>
+			<li>
+				<a class="logout" href="/index.html">退出</a>
+			</li>
+		</ul>
+	<%} else {%>
+		<ul class="list-inline">
+			<li>
+				<a href="/member/login.html">登录</a>
+			</li>
+			<li>
+				<a href="/member/register.html">注册</a>
+			</li>
+		</ul>
+	<%}%>
+</script>
+<script id="mainHeaderCartDetailTemplate" type="text/template">
+	<%if (!_.isEmpty(cart.cartItems)) {%>
+		<div class="cart-detail-body">
+			<ul>
+				<%_.each(cart.cartItems, function(cartItem, i) {%>
+					<li>
+						<a href="<%-cartItem.skuPath%>">
+							<img src="<%-cartItem.skuThumbnail%>" alt="<%-cartItem.skuName%>">
+							<span class="text-overflow" title="<%-cartItem.skuName%>"><%-cartItem.skuName%></span>
+						</a>
+						<span>
+							<strong><%-$.currency(cartItem.price, true, false)%></strong>
+							&times; <%-cartItem.quantity%>
+						</span>
+					</li>
+				<%});%>
+			</ul>
+		</div>
+		<div class="cart-detail-footer">
+			共计:
+			<strong><%-$.currency(cart.effectivePrice, true, true)%></strong>
+			<a class="pull-right" href="../../cart/list.html">商品结算</a>
+		</div>
+	<%} else {%>
+		<p>您的购物车是空的，请去挑选您的商品！</p>
+	<%}%>
+</script>
+<script>
+		$().ready(function() {
+
+			var $document = $(document);
+			var $mainHeaderTopAd = $("#mainHeaderTopAd");
+			var $mainHeaderTopAdClose = $("#mainHeaderTopAd button.close");
+			var $mainHeaderMemberInfo = $("#mainHeaderMemberInfo");
+			var $mainHeaderProductSearchForm = $("#mainHeaderProductSearch form");
+			var $searchType = $("#mainHeaderProductSearch [data-search-type]");
+			var $mainHeaderProductSearchKeyword = $("#mainHeaderProductSearch input[name='keyword']");
+			var $mainHeaderCart = $("#mainHeaderCart");
+			var $mainHeaderCartQuantity = $("#mainHeaderCart em");
+			var $mainHeaderCartDetail = $("#mainHeaderCart div.cart-detail");
+			var $mainHeaderMainNavInkBar = $("#mainHeaderMainNav div.ink-bar");
+			var $mainHeaderMainNavItem = $("#mainHeaderMainNav li");
+			var $mainHeaderMainNavActiveItem = $("#mainHeaderMainNav li.active");
+			var mainHeaderMemberInfoTemplate = _.template($("#mainHeaderMemberInfoTemplate").html());
+			var mainHeaderCartDetailTemplate = _.template($("#mainHeaderCartDetailTemplate").html());
+
+			// 顶部广告
+			if (sessionStorage.getItem("mainHeaderTopAdHidden") == null) {
+				$mainHeaderTopAd.show();
+			}
+
+			// 顶部广告
+			$mainHeaderTopAdClose.click(function() {
+				sessionStorage.setItem("mainHeaderTopAdHidden", "true");
+				$mainHeaderTopAd.velocity("slideUp");
+			});
+
+			// 会员信息
+			$mainHeaderMemberInfo.html(mainHeaderMemberInfoTemplate({
+				currentUser: $.getCurrentUser()
+			}));
+
+			// 用户注销
+			$mainHeaderMemberInfo.on("click", "a.logout", function() {
+				localStorage.setItem('username','')
+				localStorage.setItem('authority','')
+				localStorage.setItem('token','')
+				let cartDatas = JSON.parse(localStorage.getItem('cartDatas'))
+				cartDatas.cartItems = []
+				localStorage.setItem('cartDatas',JSON.stringify(cartDatas))
+				window.location.href=document.referrer;
+                $document.trigger("loggedOut.shopxx.user", $.getCurrentUser());
+			});
+
+			// 搜索类型
+			$searchType.click(function() {
+				var $element = $(this);
+				var searchType = $element.data("search-type");
+
+				$element.closest("div.input-group").find("[data-toggle='dropdown'] span:not(.caret)").text($element.text());
+
+				switch (searchType) {
+					case "product":
+						$mainHeaderProductSearchForm.attr("action", "/product/search.html");
+						break;
+					case "store":
+						$mainHeaderProductSearchForm.attr("action", "/store/search.html");
+						break;
+				}
+			});
+
+			// 商品搜索
+			$mainHeaderProductSearchForm.submit(function() {
+				if ($.trim($mainHeaderProductSearchKeyword.val()) === "") {
+					return false;
+				}
+			});
+
+			// 购物车
+				// 购物车
+			$mainHeaderCart.hover(function() {
+				var loading = true;
+
+				setTimeout(function() {
+					if (loading) {
+						$mainHeaderCartDetail.html('<div class="cart-loader"><span></span><span></span><span></span><span></span><span></span></div>');
+					}
+				}, 500);
+				let data = $.getCurrentCart()
+
+					loading = false;
+					$mainHeaderCartDetail.html(mainHeaderCartDetailTemplate({
+						cart: data
+					}));
+
+			});
+
+			// 购物车数量
+			var currentCartQuantity = $.getCurrentCartQuantity();
+			if (currentCartQuantity != null) {
+				$mainHeaderCartQuantity.text(currentCartQuantity < 100 ? currentCartQuantity : "99+");
+			}
+
+			// 购物车数量
+			$document.on("complete.shopxx.setCurrentCartQuantity", function(event, quantity) {
+				$mainHeaderCartQuantity.text(quantity < 100 ? quantity : "99+");
+			});
+
+			// 主导航
+			if ($mainHeaderMainNavItem.length > 0) {
+				if ($mainHeaderMainNavActiveItem.length < 1) {
+					$mainHeaderMainNavActiveItem = $mainHeaderMainNavItem.first();
+				}
+
+				$mainHeaderMainNavInkBar.css({
+					width: $mainHeaderMainNavActiveItem.outerWidth(),
+					display: "block",
+					left: $mainHeaderMainNavActiveItem.position().left
+				});
+
+				$mainHeaderMainNavItem.hover(function() {
+					var $element = $(this);
+
+					$mainHeaderMainNavInkBar.css({
+						width: $element.outerWidth(),
+						left: $element.position().left
+					});
+				}, function() {
+					$mainHeaderMainNavInkBar.css({
+						width: $mainHeaderMainNavActiveItem.outerWidth(),
+						left: $mainHeaderMainNavActiveItem.position().left
+					});
+				});
+			}
+
+		});
+		</script>
+<header class="main-header">
+<div id="mainHeaderTopAd" class="top-ad">
+<button class="close" type="button">
+<span>&times;</span>
+</button>
+<a href="/product/detail/51.html"  target="blank">
+<img src="/images/cc976454-1494-43de-96a8-fda391c880a9.jpg"  alt="空调0元安装放心购">
+</a>
+</div>
+<div class="top-nav">
+<div class="container">
+<div class="row">
+<div class="col-xs-12">
+<div id="mainHeaderMemberInfo" class="pull-left"></div>
+<ul class="list-inline pull-right">
+<li>
+<a href="/member/login.html" >会员中心</a>
+</li>
+<li>
+<a href="../../member/order/list.html" >我的订单</a>
+</li>
+<li class="top-nav-dropdown">
+<a href="javascript:;">
+商家服务
+<span class="caret"></span>
+</a>
+<ul class="business">
+<li>
+<a href="../../business/login-redirectUrl=-business-index.html"  target="_blank" rel="noopener noreferrer">商家中心</a>
+</li>
+<li>
+<a href="../../business/register.html" >商家入驻</a>
+</li>
+</ul>
+</li>
+
+
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="container">
+<div class="row">
+<div class="col-xs-3 logo-container" >
+    <a>
+        <img  class="logo-img" src="/images/logo.png"  alt="聚点商城">
+        <div class="logo-text" >
+            <h3>聚点商城</h3>
+        </div>
+    </a>
+</div>
+<div class="col-xs-6">
+<p class="empty-header-center-block"></p>
+</div>
+<div class="col-xs-3">
+
+</div>
+</div>
+<div class="row">
+<div class="col-xs-2">
+<a class="product-category" href="../../product_category.html" >
+<i class="iconfont icon-sort"></i>
+所有商品分类
+</a>
+</div>
+<div class="col-xs-10">
+<div id="mainHeaderMainNav" class="main-nav">
+<div class="ink-bar"></div>
+<ul>
+<li>
+<a href="../../index.html" >首页</a>
+</li>
+<li>
+<a href="../../product/list/1.html" >手机数码</a>
+</li>
+<li>
+<a href="../../product/list/2.html" >办公家电</a>
+</li>
+<li>
+<a href="../../product/list/3.html" >精品服饰</a>
+</li>
+<li>
+<a href="../../product/list/4.html" >珠宝饰品</a>
+</li>
+<li>
+<a href="../../product/list/5.html" >美妆护肤</a>
+</li>
+
+<li>
+<a href="../../product/list-type=EXCHANGE.html" >积分商城</a>
+</li>
+<li>
+<a href="../../product/list-promotionPluginId=groupBuyingPromotionPlugin.html" >团购商城</a>
+</li>
+<li>
+<a href="1.html" >商城动态</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</header><script id="historyProductTemplate" type="text/template">
+	<h4>
+		浏览记录
+		<%if (!_.isEmpty(data)) {%>
+			<a class="clear pull-right" href="javascript:;">清空</a>
+		<%}%>
+	</h4>
+	<%if (!_.isEmpty(data)) {%>
+		<ul class="clearfix">
+			<%_.each(data, function(product, i) {%>
+				<li>
+					<a href="<%-product.path%>" target="_blank" rel="noopener noreferrer">
+						<img class="img-responsive center-block" src="<%-product.thumbnail != null ? product.thumbnail : "/images/default_thumbnail_product_image.png"%>" alt="<%-product.name%>">
+						<h5 class="text-overflow" title="<%-product.name%>"><%-product.name%></h5>
+					</a>
+				</li>
+			<%});%>
+		</ul>
+	<%} else {%>
+		<p>暂无信息</p>
+	<%}%>
+</script>
+<script>
+			$().ready(function() {
+
+				var $window = $(window);
+				var $document = $(document);
+				var $body = $("body");
+				var $mainSidebar = $("#mainSidebar");
+				var $mainSidebarCartQuantity = $("#mainSidebarCart em");
+				var $mainSidebarTooltipToggle = $("#mainSidebar [data-toggle='tooltip']");
+				var $historyProductCollapse = $("#historyProductCollapse");
+				var $mainSidebarQrcodeContent = $("#mainSidebarQrcode div.content");
+				var $mainSidebarBackTop = $("#mainSidebarBackTop");
+				var $mainSidebarHistoryProduct = $("#mainSidebarHistoryProduct");
+				var mainSidebarBackTopHidden = true;
+				var mainSidebarExpanded = false;
+				var historyProductTemplate = _.template($("#historyProductTemplate").html());
+				var historyProductIdsLocalStorageKey = "historyProductIds";
+
+				// 购物车数量
+				var currentCartQuantity = $.getCurrentCartQuantity();
+
+				if (currentCartQuantity != null) {
+					$mainSidebarCartQuantity.text(currentCartQuantity < 100 ? currentCartQuantity : "99+");
+				}
+
+				// 购物车数量
+				$document.on("complete.shopxx.setCurrentCartQuantity", function(event, quantity) {
+					$mainSidebarCartQuantity.text(quantity < 100 ? quantity : "99+");
+				});
+
+				// 提示
+				$mainSidebarTooltipToggle.tooltip();
+
+				// 浏览记录展开/折叠
+					// $document.on("click", function(e) {
+				// 	if ($mainSidebar.data("collapse-disabled") === "true") {
+				// 		return;
+				// 	}
+				// 	if ($historyProductCollapse[0] === e.target || $.contains($historyProductCollapse[0], e.target) || (mainSidebarExpanded && !$.contains($mainSidebar[0], e.target))) {
+				// 		$mainSidebar.velocity({
+				// 			right: mainSidebarExpanded ? -300 : 0
+				// 		}, {
+				// 			begin: function() {
+				// 				$mainSidebar.data("collapse-disabled", "true");
+				// 				if (!mainSidebarExpanded) {
+				// 					loadHistoryProduct();
+				// 				}
+				// 			},
+				// 			complete: function() {
+				// 				$mainSidebar.removeData("collapse-disabled");
+				// 				mainSidebarExpanded = !mainSidebarExpanded;
+				// 			}
+				// 		}, 500);
+				// 	}
+				// });
+
+				// 加载浏览记录
+				function loadHistoryProduct() {
+					var historyProductIdsLocalStorage = localStorage.getItem(historyProductIdsLocalStorageKey);
+					var historyProductIds = historyProductIdsLocalStorage != null ? JSON.parse(historyProductIdsLocalStorage) : [];
+
+					$.get("/product/history", {
+						productIds: historyProductIds
+					}).done(function(data) {
+						localStorage.setItem(historyProductIdsLocalStorageKey, JSON.stringify($.map(data, function(item) {
+							return item.id
+						})));
+						$mainSidebarHistoryProduct.html(historyProductTemplate({
+							data: data
+						}));
+					});
+				}
+
+				// 清空浏览记录
+				$mainSidebarHistoryProduct.on("click", ".clear", function() {
+					localStorage.removeItem(historyProductIdsLocalStorageKey);
+					$mainSidebarHistoryProduct.html(historyProductTemplate({
+						data: {}
+					}));
+					return false;
+				});
+
+				// 二维码
+				$mainSidebarQrcodeContent.qrcode({
+					width: 100,
+					height: 100,
+					text: location.href
+				});
+
+				// 返回顶部
+				$window.scroll(_.throttle(function() {
+					if ($window.scrollTop() > 500) {
+						if (mainSidebarBackTopHidden) {
+							mainSidebarBackTopHidden = false;
+							$mainSidebarBackTop.velocity("fadeIn");
+						}
+					} else {
+						if (!mainSidebarBackTopHidden) {
+							mainSidebarBackTopHidden = true;
+							$mainSidebarBackTop.velocity("fadeOut");
+						}
+					}
+				}, 500));
+
+				// 返回顶部
+				$mainSidebarBackTop.click(function() {
+					$body.velocity("stop").velocity("scroll", {
+						duration: 1000
+					});
+				});
+
+			});
+		</script>
+<aside id="mainSidebar" class="main-sidebar clearfix">
+<div class="main-sidebar-body">
+<ul>
+<li>
+<a id="mainSidebarCart" class="cart" href="../../cart/list.html" >
+<i class="iconfont icon-cart"></i>
+<span>购物车</span>
+<em>0</em>
+</a>
+</li>
+<li>
+<a href="../../member/order/list.html"  title="我的订单" data-toggle="tooltip" data-placement="left">
+<i class="iconfont icon-form"></i>
+</a>
+</li>
+
+<li>
+<a href="/member/product_favorite/list.html"  title="我的收藏" data-toggle="tooltip" data-placement="left">
+<i class="iconfont icon-like"></i>
+</a>
+</li>
+<li>
+<a href="../..//member/coupon_code/list.html"  title="优惠券" data-toggle="tooltip" data-placement="left">
+<i class="iconfont icon-ticket"></i>
+</a>
+</li>
+<li>
+
+</li>
+</ul>
+<a id="mainSidebarBackTop" class="back-top" href="javascript:;" title="返回顶部">
+<i class="iconfont icon-top"></i>
+</a>
+</div>
+<div class="main-sidebar-right">
+<div id="mainSidebarHistoryProduct" class="history-product"></div>
+</div>
+</aside> <main>
+<div class="container">
+<div class="row">
+<div class="col-xs-2">
+<div class="hot-article-category">
+<div class="hot-article-category-heading">
+<h4>热点分类</h4>
+</div>
+<div class="hot-article-category-body">
+<ul>
+<li>
+<a href="1.html" >商城动态</a>
+</li>
+<li>
+<a href="2.html" >促销活动</a>
+</li>
+<li>
+<a href="3.html" >购物指南</a>
+</li>
+<li>
+<a href="4.html" >支付方式</a>
+</li>
+<li>
+<a href="5.html" >配送方式</a>
+</li>
+<li>
+<a href="6.html" >订单服务</a>
+</li>
+<li>
+<a href="7.html" >售后服务</a>
+</li>
+<li>
+<a href="8.html" >商家服务</a>
+</li>
+</ul>
+</div>
+</div>
+<div class="hot-article">
+<div class="hot-article-heading">
+<h4>热点文章</h4>
+</div>
+<div class="hot-article-body">
+<ul>
+<li class="text-overflow">
+<a href="../detail/36_1.html"  title="商家入驻">商家入驻</a>
+</li>
+<li class="text-overflow">
+<a href="../detail/35_1.html"  title="商家入驻协议">商家入驻协议</a>
+</li>
+<li class="text-overflow">
+<a href="../detail/38_1.html"  title="运营服务">运营服务</a>
+</li>
+<li class="text-overflow">
+<a href="../detail/37_1.html"  title="商家帮助">商家帮助</a>
+</li>
+<li class="text-overflow">
+<a href="../detail/39_1.html"  title="规则中心">规则中心</a>
+</li>
+</ul>
+</div>
+</div>
+<script>
+		$().ready(function() {
+
+			var $articleSearchForm = $("#articleSearchForm");
+			var $keyword = $("#articleSearchForm [name='keyword']");
+
+			// 搜索
+			$articleSearchForm.submit(function() {
+				if ($.trim($keyword.val()) === "") {
+					return false;
+				}
+			});
+
+		});
+		</script>
+<div class="article-search">
+<form id="articleSearchForm" action="/article/search.html" method="get">
+
+</form>
+</div> </div>
+<div class="col-xs-10">
+<ol class="breadcrumb">
+<li>
+<a href="../../index.html" >
+<i class="iconfont icon-homefill"></i>
+首页
+</a>
+</li>
+<li class="active">商家服务</li>
+</ol>
+<div class="list panel panel-default">
+<div class="panel-body">
+<ul>
+<li>
+<h4>
+<a href="../detail/39_1.html"  title="规则中心">规则中心</a>
+</h4>
+<p class="text-overflow">交易争议处理规范 一、总则 1、为构建商城开放、透明、诚信、尽责的经营环境，明确存在争议的交易款项归属或资金赔偿，保障商城上买家和商家在交易中的合法权益，依据《中华人民共和国合同法》、《消费者权益保护法》、《网络交易管理办法》等相关法律法规以及商城《商家管理规范总则》，制定本规范。 2、商城争议处理规范，是买家和商家不可撤销地授权商城基于相关法律法规、商城《商家管理规范总则》以及自己的判断，作为独立第三方，对买卖双方存在争议的交易款项归属或资金赔偿做出处理的基本程序与标准。 3、商城将基于法律法规、平台规则及普通人的判断，根据本规范的规定对买卖双方的争议做出处理。商城并非司法机关，对凭证/证据的鉴别能力及对争议的处理能力有限，商城不保证争议处理结果符合买家和(或)商家的期望，也不对依据本规范做出的争议处理结果承担任何责任。 4、处理争议期间，商城通过商城在线客服系统、电子邮件、短信或电话等方式向买卖双方发送的与争议处理相关的提示或通知，构成本规范的有效组成部分。 5、商城有权随时变更本规范并在网站上予以公告。买家和（或）商家不同意相关变更的，可自行协商或通过其他途径解决争议。 6、买家与商家应当严格遵守国家法律法规，对于本规则已有的规定，买家与商家争议适用于本规范，本规范尚无规定的，商城有权依据法律法规及一般规律酌情处理。商城对于当事人的处罚，不免除其应承担的法律责任及赔偿义务。商城有权对于用户行为的规范进行单方认定，并据此处理。 二、成交后争议仲裁规范 1、成交后争议仲裁系指交易完结(系指商城系统显示“已退货”或“已完成”时的状态)前买卖双方提起交易保障要求，商城根据相关要求对交易款项归属作出处理的基本程序与标准。 2、本章规定事项为成交后争议仲裁的一般规定，本规范第四章特殊交易争议处理规范有特殊要求的，依照第四章的规定处理。 3、买家在商城上的交易过程中，如因商家原因使交易产生纠纷，可提请商城从中予以协调，经商城审核后，有权通过电话或电子邮件等联系方式向纠纷双方了解情况，商家应积极配合商城工作人员调解，商城有权将所了解的情况通过电话或邮件等方式互相通知对方。 4、商家交付给买家的商品应当符合法律法规的相关规定，商家发布的商品品类不得超出与商城签订的合同约定范围，且所售商品不得违反商城《商家管理规范总则》和《商城商家违规行为及处理规则》中关于发布违禁信息、滥发信息、滥用关键字，发布违禁商品、广告商品，出售假冒商品、假冒材质成份、出售未经报关进口商品、伪造产地商品等条款的相关规定。 5、商家应当对其所售商品进行如实描述，即应当在商品描述页面、店铺页面、商城在线客服系统等所有商城提供的宣传渠道中，对商品的基本属性、成色、瑕疵等必须说明的信息进行真实、完整的描述。如因商家提供的商品信息存在问题而引起的任何纠纷，商家应自行负责解决，商家未能按照商城要求及时解决纠纷的，商城有权视纠纷情况先行处理，商家应当接受商城的一切处理结果；如给商城造成任何损失，全部由商家负责赔偿。商城有权审核商家提供的商品信息，对不符合法律、法规或商城有理由相信如果发布将给商城带来不利影响的商品信息，商城有权要求商家进行修改，也有权拒绝删除该信息。 6、商家应当对其所售商品质量承担保证责任，保证有关商品和服务本身的合法性，其交付给买家的商品须已验明产品合格证明和其他标识，并在合理期限内可以正常使用，包括商品不存在危及人身财产安全的不合理危险、具备商品应当具备的使用性能、符合商品或其包装上注明采用的标准等。如因商家非法或违规经营而引起的法律纠纷，由商家自行负责解决，同时，商城有权对涉及的商品做下架处理；如给商城造成损失，商家应负全部责任。 7、商品属于“三包”(系指法律法规规定的三包或所在地适用的三包，以下简称“三包规定”)范围内的，买家要求商家履行换货或维修义务的，商家应当按照买家的要求提供相应服务，不可故意拖延或无理拒绝。 8、商家所售商品为虚拟物品的，应当确保其交付给买家的虚拟物品符合约定的使用目的和期限，并按照订单约定的数量向买家交付虚拟物品。 9、买卖双方应当进行真实交易，不进行以增加信用和销量为目的的虚假交易。 10、商家应当在买家付款后的72小时内或与买家约定的时间内发货，如有延迟发货情况出现，按照交易笔数对商家进行处罚。延迟发货是指除特殊商品外，商家在买家付款后实际未在72小时内发货，或定制、预售及其他特殊情形等另行约定发货时间的商品，商家实际未在约定时间内发货，妨害买家购买权益的行为（商家的发货时间，以快递公司系统内记录的时间为准）。商家需向买家支付不超过该商品实际成交金额的30%（金额最高不超过500元）作为违约金。买家申请退款时商家尚未发货的，商家应当征得买家同意后再发货。商家逾期发货，或者未经买家同意在买家申请退款后发货，商家有权追回已经发出的商品，但买家已经签收并确认收货的除外。 11、买家应当在订单中向商家提供准确的收货地址和收货人信息。 12、买家在提供收货人信息时，可以选择本人或者他人作为收货人。买家选择他人作为收货人，该收货人违反本节约定义务的，由买家承担相应责任。 13、因买家填写的收货地址和(或)收货人信息不准确，或者未经商家同意要求变更收货地址或收货人信息，导致商家发货后无法送达的，运费由买家承担。 14、买家只填写了收货地址，但没有填写收货人或填写的收货人信息不特定，商品在收货地址被签收的，该签收视为买家本人签收。 15、商家按照约定发货后，收货人有收货的义务。 16、六、收货人可以本人签收商品或委托他人代为签收商品，被委托人的签收视为收货人本人签收。 17、收货人签收商品时，应当对商品进行验收。 18、收货人签收商品时发现表面不一致的情形，有权拒绝签收商品。 19、对于需要先签收再打开包装查看的商品，收货人应当要求承运人当场监督并打开包装查看，如发现表面不一致，应当在签收单(收货人联和承运人联)上备注详细情况并让承运人签字确认或者直接退回商品。 20、收货人签收商品后，商品毁损、灭失及瑕疵的风险由商家转移给买家，但自买家签收起六个月内，因商品瑕疵而发生争议的，由商家承担有关瑕疵的举证责任，举证材料包括但不仅限于买家签收商品单据、产品合格证明、商城质量检验证明等。 21、买卖双方达成退货或换货协议，或商城做出退货退款的处理结果后，商家应当在收到商城处理结果后的24小时内或者与买家约定的时间内提供退货地址。商家逾期未提供退货地址的，以其在商城系统内填写的“默认退货地址”作为退货地址。 22、商家提供的退货地址错误导致买家操作退回商品后无法送达的，商家承担因此产生的运费。 23、买家根据协议约定或商城做出的处理结果操作退货时，应当使用与商家发货时相同的运输方式发货，运费差价由买家承担。除非得到商家的明确同意，买家不得使用到付方式支付运费。退货后，商家有收货的义务。 24、买卖双方应当在交易前对商品情况、交易过程及物流费用进行详细、清晰明确的约定。因商家在提供商品或者服务过程中，采取虚假或者其他不正当手段欺骗、误导买家，使买家的合法权益受到损害的，商家需向买家增加赔偿其损失，增加赔偿金额为该商品价款或者服务费用的三倍，增加赔偿的金额不足五百元的，为五百元。法律另有规定的，依照其规定。 25、商家应当使用有揽收和签收凭证的运输方式发货。买家要求使用没有揽收和签收凭证的运输方式(以下简称“平信方式”)发货的，商家应当在发货前以商城在线客服系统的方式明确告知买家该方式存在的风险，并截图留证。 26、买卖双方指定了特定承运人的，商家应当委托该特定承运人运送商品。商家违反前款约定的，买家有权拒绝签收商品。 27、经买家明确同意，商家可以使用到付方式委托承运人发货。未经买家明确同意，商家使用到付方式委托承运人发货的，买家有权拒绝签收商品；买家签收商品的，到付运费超出约定运费的部分由商家承担。本规范所称到付方式系指在委托承运人时不支付运费，而由收货人在收货时向承运人支付运费的运输方式。 28、商家应当对运费的承担和组成做出清晰、准确的描述。 29、运费由买家承担的，商家应当按照实际发生的金额向买家收取运费，运费水平须与相应物流公司水平保持一致。 30、商品在换货或维修过程中需要寄送且未约定运费承担方式的，因此产生的运费由商家承担。 31、错发、漏发等需补发商品/配件的流程：商家收到需补发商品/配件的通知后，由商家按照商城发货及配送时限重新直接为客户补发商品/配件，补发产生的运费由商家承担。 32、商家交易行为违反法律法规规定，或为依据商城《商家管理规范总则》中的出售假冒商品、出售未经报关进口商品、拖欠贷款、骗取他人财物行为，一经查实，商城将给予相应处罚。 33、商品存在质量问题或与网上描述不符的，一经查实，商城将给予相应处罚。 34、因商品存在危及人身财产安全的不合理危险，导致买家损失的，由买卖双方另行协商或通过其他途径解决，商城不予处理。 35、商家交付给买家的交易凭证虚假，商家不同意重新开具且买家拒绝保留商品的，交易做退货退款处理。 36、商家所售商品为虚拟物品的 37、就成交后而言，买卖双方采用不正当手段提高商品销量、DSR评分等行为（包括但不限于向商城工作人员及或其关联人士提供财物、消费、款待或商业机会等；通过其他手段谋取不正当利益的，一经查实，商城将给予相应处罚。就售后而言，买卖双方有38、条所述行为的，驳回买家退款要求。 38、商家违反发货规范，导致买家未收到货、拒绝签收商品或者签收后退回商品的，交易做退款处理，运费由商家承担。如因延迟发货导致买家投诉的，商家需向买家支付不高于该商品实际成交金额的30%（金额最高不超过500元）作为违约金。 39、买家依据签收规范拒绝签收商品或者退回商品的，交易做退款处理，运费由商家承担。涉及表面一致的事项，买家提供有效凭证证明签收时既已存在表面不一致情形的，交易做退款或退货退款处理；买家无法有效举证的，交易做打款处理。 40、有关退换货处理措施以买卖双方协商决定为主，若商城介入仲裁，则以相关法律法规、《商家管理规范总则》等平台相关规则规范等为准。此外，买家或商家违反退换货相关规范的，作如下处理： 41、买卖双方约定不清，根据本规范无法确定争议的责任归属的，交易作退货退款处理，发货运费由商家承担，退货运费由买家承担。 42、交易中的运费争议，根据“谁过错，谁承担”的原则处理，但买卖双方协商一致的除外。本规范已经做出明确规定的，按照相应的规定处理。 三、售后争议处理规范 1、售后争议处理系指交易完结后买卖双方提起交易保障要求，商城对相关要求对交易赔偿作出处理的基本程序与标准。 2、符合商城平台规则约定条件的买家在交易成功后提起的未收到货、商品描述不符、商品存在质量问题、商家未履行售后服务或特色服务的保障要求的，参照本规范售中争议处理相应条款进行认定，商城平台规则中有特别规定的除外。 3、对于国家规定或者商家与买家约定包修、包换、包退的商品，商家应当负责修理、更换或者退货，在保修期内两次修理仍不能正常使用的，商家应当负责更换或者退货。对包修、包换、包退的大件商品，买家要求商家修理、更换、退货的，商家应当承担运输等合理费用。如商家未按时提供售后服务的，则商城有权视客户投诉情况，直接为客户办理退货退款等事宜，因此产生的全部费用及损失均由商家承担。 4、如买家对商家销售的商品真伪、质量、重量（珠宝类）等方面提出质疑的，商家应对疑问作出明确合理的解释，且应提供相应的文件资料予以证明。如商家无法提供文件证明或提供的文件不足以证明客户投诉无依据，则应为客户办理退货，承担退货产生的费用，如因此产生损失的，商家应予以全部赔偿。 四、特殊交易争议处理规范 1、买卖双方不通过本商城或者采用当面交付商品的方式进行交易的，应当自行承担因此产生的风险。 2、因买家未收到货产生的争议，交易做退款处理，但商家可以证明买家收到商品的除外。 3、因商品表面不一致产生的争议，交易做打款处理，但商家可以证明已自认商品存在表面不一致的除外。 4、因商品描述不符、存在质量问题产生的争议，适用本规范第十一条和第十二条的规定进行处理。 5、需要买家预先支付部分款项的交易，买卖双方应当具体约定该部分款项的支付和返还条件。仅以“定金”、“订金”、“预付款”等字样进行描述，但未明确约定具体支付和返还条件的，相应争议依据法律规定参照第二章和第三章的处理。 6、买卖双方进行定制商品交易的，应当对商品的交付时间、交付标准作明确的约定。未约定具体交付时间的，商家应当在买家首次要求交付后的三天内发货。未约定交付标准的，适用本规范第三十二条的规定进行处理。 7、买卖双方约定的商品交付时间届满前，买家不得要求退款，但商家明确表明不履行定制合同的除外。 8、买家无正当理由拒绝签收定制商品的，应当承担商家因此产生的损失，具体标准由商城根据实际情况判断。 五、举证责任 1、争议处理过程中，商城有权要求买家或商家提供证明证据，且有权单方判断证据的效力。 2、买家主张未收到货的，商家对买家已按照本规范规定签收商品承担举证责任。 3、买家签收商品后，因表面不一致产生争议的，买家对签收商品时即已存在表面不一致的情形承担举证责任。但对于商家提供的冰箱洗衣机、厨房卫浴电器、电脑、家用视听设备、空调、整车等耐用商品或者装修设计/施工/监理等服务，自买家签收商品（以物流签收时间为准）或接受服务之日起六个月内，因商品瑕疵而发生争议的，由商家承担有关瑕疵的举证责任，举证材料包括但不仅限于买家签收商品单据、产品合格证明、商城质量检验证明等。 4、买家主张收到的商品存在质量问题或系假冒商品且通过肉眼无法做出判断的，商家应当按照商城的要求提供厂家的经销凭证、产品合格证、商业发票等证明文件。买家主张商品存在质量问题或与网上描述不符，且可通过肉眼做出判断的，商城有权根据商品图片直接认定。 5、商家提供符合本规范第五十条规定的证明文件后，买家应当根据商城的要求提供相应的检测凭证。 6、如果商家没有声明发货，但在买家申请退款前已经实际发货的，应当提供相应的发货凭证。 7、因虚拟物品产生的争议，买卖双方应当按照商城的要求提供相关官方网站的查询记录或者相关单位的书面证明进行举证。 8、针对商城受理的各类型争议所需提供的全部证明文件，以商城要求的内容为准。 9、商城作为独立第三方，仅对双方提交的证据进行形式审查，并作出独立判断，双方自行对证据的真实性、完整性、准确性和及时性负责，并承担举证不能的后果。 六、争议仲裁程序 1、买申请退款后，买卖双方可以选择自行协商、要求商城介入或通过司法途径等方式解决存在的争议。任一方要求商城介入的，商城即有权根据本规范对争议进行仲裁。 2、买卖双方向商城申请争议仲裁，必须符合以下条件： 3、商城对符合第五十九条的争议处理申请，予以受理；对下列申请，分别情形，予以处理。 4、商城处理争议期间，买卖双方应当按照商城系统的提示和（或）商城规定的时间内提供凭证。 5、商城收集到双方提供的凭证后，将在商城系统提示的时间内，按照本规范对相应争议仲裁；本规范没有明确规定的，由商城依其独立判断仲裁。 6、商城按照其独立判断，根据不同情况，将对买卖双方的争议做类型的处理。 7、商城处理争议期间，有下列情形之一的，商城中止处理相应争议。 8、买卖双方一致要求自行协商处理争议的，应当在提出协商要求后的30天内自行操作交易款项，或向商城提供协商结果，由商城代为操作。逾期未操作交易款项也未告知协商结果的，商城有权根据本规范处理争议。 9、商城处理争议期间，买卖双方达成退款协议，但无法自行操作的，商城将根据双方达成的退款协议，通知本商城操作相应的交易款项和（或）保证金。 10、商城对争议做出处理后，有权通知本商城按照处理结果将交易款项和（或）保证金的全部或部分支付给买家和（或）商家，或由商家（或买家）按照处理结果将相关款项支付给买家（或商家）。 11、在将交易款项全部支付给买家后，根据争议处理结果仍需商家承担责任的，商城有权通知本商城，自商家根据《商家管理规范总则》缴纳的保证金或其他款项中划拨相应的钱款补偿支付给买家。 12、处理争议期间，商城使用消费者保障资金代替商家先行退款给买家（亦称“先行垫付”）的，交易做出处理后，商城有权通知本商城，将交易款项、保证金或买家易付宝账户中与先行垫付金额相当的部分划扣至消费者保证基金账户。 13、商城对争议做出处理并通知本商城支付争议款项后，买家或(和)商家对商城的处理有异议的，可向人民法院起诉。 14、争议通过司法途径解决的，商城将根据司法机关的生效法律文书，通知本商城操作相应的交易款项和相关保证金。 七、附则 1、商城对争议做出处理后，不免除买卖双方基于与商城签署的其他协议、规则应当承担的责任。 2、商城定期或不定期的官方活动规则，对买卖双方争议处理有特殊要求的，按照活动规则的特殊要求进行处理。 3、本规范生效或变更前商城已介入处理的争议，适用当时的规范进行处理；本规范生效或变更后商城介入处理的争议，适用本规范或变更后的规范进行处理。</p>
+<p>
+<span class="small text-gray">聚点商城</span>
+<span class="small text-gray" title="2018-01-25 00:01:30">2018-01-25</span>
+</p>
+</li>
+<li>
+<h4>
+<a href="../detail/38_1.html"  title="运营服务">运营服务</a>
+</h4>
+<p class="text-overflow">一、进口商品 1、如经营进口商品，仅须提交该品牌近一年内中华人民共和国海关进口货物报关单复印件。 二、以下产品需提供检测报告（每个品牌须至少提供一份由第三方权威机构出具的检测报告，成品检测报告内容须包含品牌名称、产品名称和各类产品对应的下述必检项目），必要检测项要求如下： 1、男女装/文胸/塑身服/童装/孕妇装/袜子：成分含量、GB18401全套、标识标志。 2、三岁以下婴幼儿服装类：成分含量、GB18401全套、标识标志、外观质量、耐唾液色牢度。 3、家居服/保暖内衣：成分含量、GB18401全套、标识标志、外观质量、水洗尺寸变化率。 4、羽绒服装：成分含量、GB18401全套、标识标志、外观质量、含绒量、充绒量、种类鉴定。 5、皮革/皮草类服饰：摩擦色牢度（仅皮革）、皮革撕裂力（仅皮革）、甲醛含量、可分解芳香胺染料、标识标志、外观质量、材质鉴定。 6、针织衫：成分含量、GB18401全套、标识标志、水洗尺寸变化率。 7、手套/领带/领结/帽子/手帕/围巾/丝巾/披肩/布面料/毛线:GB18401全套，以及标识标志。 三、注意事项 1、GB18401全套包括：耐水色牢度、耐汗渍色牢度、耐干摩擦色牢度、甲醛、PH值、异味、可分解芳香胺染料。 2、有填充物的产品（除羽绒）需加检“原料要求”，皮革类（鞋服、皮带、手套）需加检“材质鉴定”。 3、种类鉴定，主要指“鹅鸭绒种类鉴定”。 4、服饰类目跨鞋类箱包、家纺、母婴童装等类目，需同时提供跨类目产品的检测报告（由第三方权威检测机构出具）。</p>
+<p>
+<span class="small text-gray">聚点商城</span>
+<span class="small text-gray" title="2018-01-25 00:01:29">2018-01-25</span>
+</p>
+</li>
+<li>
+<h4>
+<a href="../detail/37_1.html"  title="商家帮助">商家帮助</a>
+</h4>
+<p class="text-overflow">一、入驻所需材料 1、营业执照副本：需完成有效年检且所售商品属于经营范围内。 2、税务登记证副本：国税、地税均可，优先上传盖有国税局印章的税务登记证。 3、组织机构代码证副本：织机构代码证必须要年检，年检要求同营业执照年检要求一致，如果出现当地政策规定不定期（非正常年度）年检的情况，需出具政府发文文件的复印件并加盖供应商公章。 4、一般纳税人资质证明：扫描件一般纳税人证书如果纳税人在辅导期的，需出具我司模板的“辅导期商函”，模板。 5、法人身份证：正反面扫描件。 二、开票限额证明函 1、原则上开票限额证明函为：税务部门出具的“开票限额审批表”，即为供应商在取得税务登记证后，申请开票时税务机关出具的审批证明，“开票限额审批表”须附有税务局盖章。 2、如“开票限额审批表”遗失无法提供，可由供应商所在地的税务机关出具相关信息证明，具体模版不限，但证明中必须明确开票限额，且加盖当地税务章。 3、以上均无法提供，可由供应商执金税卡进入金税系统打印出的开票限额信息。 三、品牌资质需在有效期内 1、自有品牌：上传商标注册证或者注册申请受理通知书(若办理过变更、转让、续展，请一并提供商标总局颁发的变更、转让、续展证明)。 2、商标注册证或商标注册申请受理通知书复印件。 3、各级的正规品牌授权文件，若上一级的授权方或供货商为自然人，则需同时提供其亲笔签名的身份证复印件。</p>
+<p>
+<span class="small text-gray">聚点商城</span>
+<span class="small text-gray" title="2018-01-25 00:01:28">2018-01-25</span>
+</p>
+</li>
+<li>
+<h4>
+<a href="../detail/36_1.html"  title="商家入驻">商家入驻</a>
+</h4>
+<p class="text-overflow">商家入驻标准 1、商城暂不接受个体工商户的入驻申请，商家须为正式注册企业，也不接受非中国大陆企业的入驻申请。 2、商家必须给消费者提供正规发票，发票盖章的公司名称必须与商家与合作的公司名称一致。 3、商家必须为所经营商品的品牌方，或提供品牌销售授权证明、代理授权书。 4、拥有基本电商运营团队，具备完善的能力和售后服务能力。 5、商城有权根据包括但不仅限于品牌需求、公司经营状况、服务水平等其他因素退回商家申请；同时商城有权在申请入驻及后续经营阶段要求商家提供其他资质；商城将结合各行业发展动态、国家相关规定及消费者购买需求，不定期更新招商标准。</p>
+<p>
+<span class="small text-gray">聚点商城</span>
+<span class="small text-gray" title="2018-01-25 00:01:27">2018-01-25</span>
+</p>
+</li>
+<li>
+<h4>
+<a href="../detail/35_1.html"  title="商家入驻协议">商家入驻协议</a>
+</h4>
+<p class="text-overflow">尊敬的用户欢迎您入驻成为本网站商家。请商家用户仔细阅读以下全部内容。如商家用户不同意本服务条款任意内容，请不要注册或使用本网站服务。如商家用户通过本网站注册程序，即表示商家用户与本网站已达成协议，自愿接受本服务条款的所有内容。此后，商家用户不得以未阅读本服务条款内容作任何形式的抗辩。 一、概述 1、本协议适用于本网站开放平台商家，商家可以根据业务需求选择经营模式以通过本网站开放平台向消费者销售商品或提供服务。本规则不适用于本网站商品及信息。 2、为了促进平等、开放、透明的平台生态的搭建，根据《本网站商家入驻协议》等服务制定本规则。 3、本网站开放平台总则，是对本网站商家增加基本义务或规范商家行使基本权利的条款。 4、违规行为的认定与处理，本网站将基于法律法规的规定、协议的约定、消费者和商家提供的证据材料以及平台记录的相关信息等做出判断并依据相关规则严格执行。本网站商家在适用规则上一律平等。 5、商家应遵守国家法律、行政法规、部门规章等规范性文件。对任何涉嫌违反国家法律、行政法规、部门规章等规范性文件的行为，本规则已有规定的，适用本规则；本规则尚无规定的，本网站有权依据相应规则酌情处理，但本网站对商家的处理不免除商家因违法、违约等行为应承担的法律责任。 6、商家在本网站的任何行为，应同时遵守与本网站所签订的各项协议。 7、本网站有权随时变更本规则并在规则平台或商家管理系统等渠道予以公告。若商家不同意相关变更，应立即停止使用本网站开放平台提供的相关服务，并及时通知本网站。本网站有权对商家行为及应适用的规则/协议约定进行单方认定，并据此处理。 二、入驻 1、商家应当严格遵守本网站系统设置的入驻流程完成注册，并严格遵守《本网站商家入驻协议》的规定。商城在选择用户名时须遵守国家法律法规，不得包含违法或涉嫌侵犯他人权利等的相关信息。 2、用户必须满足以下条件，才有权申请加入本网站，成为商家： (1)、商家应符合《本网站商家入驻协议标准》； (2)、商家及其销售的商品或提供的服务应符合本网站开放平台对商品质量的相关要求； (3)、商家有效签署《本网站商家入驻协议》并承诺遵守平台全部规则要求； (4)、商家需按照开通类目的资费标准缴纳各项费用； (5)、商家满足本网站开放平台要求的其他条件； 三、经营 1、商家申请店铺名等信息时，应须遵守国家法律法规及开放平台相关规则，不得包含违法或涉嫌侵犯他人权利等的相关信息； 2、商家上传的店铺信息（包括店标、店铺名称、店铺介绍、店铺广告等）内容设置需真实、有效且与注册信息一致； 3、商家应及时缴存及补缴保证金； 4、商家应保证在本网站开放平台售卖的商品为正品或其他原创非侵权商品； 5、商家应按照本网站开放平台系统设置的流程的要求发布商品/服务； 6、商家不得编辑及发布国家法律法规或本网站规定的禁止发布的商品； 7、“商品如实描述”及对其所售商品/服务质量承担保证责任是商家的基本义务。“商品如实描述”是指商家在商品介绍页面、店铺 页面等所有本网站开放平台提供的渠道中，应当对其所发布商品的基本属性、成色、瑕疵等必须说明的信息进行真实、完整的描述。 8、商家应保证其出售的商品在合理期限内可以正常使用、提供的服务符合承诺标准，包括商品不存在危及人身财产安全的不合理危险、具备商品应当具备的使用性能、符合商品或其包装上注明采用的标准、符合提供服务时承诺的标准，且承诺标准不低于国家/行业标准等。本网站有权对商家经营的商品按照各品类抽检规范进行抽检。 9、参加本网站开放平台营销活动时，商家须遵守本网站营销活动规则。 10、商家应遵守本网站发货管理规则的相关要求，在规定/承诺时效内完成发货及揽收。 11、商家可以根据自身需求选择本网站供应链管理服务，详细服务内容及要求以双方签订的《仓储服务合同》为准。 12、商家应遵守本网站制定的商家售后服务管理规则，向消费者履行售后服务义务； 13、本网站有权对本网站介入的交易纠纷进行处理； 14、商家应遵守本网站评价管理规则对评价进行维护及管理。 四、终止合作 1、店铺服务期届满，商家未完成下一年度续签或未到店铺服务结束日期，商家提前关店的，视为商家主动终止合作。商家主动终止合作，保证金按约定进行退还，提前关店的情形，平台使用费不进行退还。 2、若商家发生以下任一情形，本网站有权进行清退： (1)、存在恶意竞争、影响消费者权益、影响本网站平台声誉等违反市场公平竞争原则、诚实信用原则、公序良俗的行为； (2)、通过不正当手段使用本网站注册LOGO、域名等用于不正当宣传、商业活动，给消费者造成误导、侵犯本网站知识产权等给本网站造成不良影响的的行为； (3)、在线上、线下等渠道，通过文字或图片等方式发布恶意诋毁、故意矮化本网站的言论，给本网站造成不良影响的行为； (4)、商家违反《本网站商家入驻协议》的行为； (5)、商家经营的品牌对他人商标、商品名称、包装和装潢、企业名称、产品质量标志等构成仿冒或容易造成消费者混淆、误认的； 3、以上情形，本网站除有权清退商家、终止与其合作外，另可向商家追究其法律责任。本网站将按照合同约定及规则办理店铺关闭手续，并按约定情形办理保证金的退还。 五、市场管理 1、为了提升消费者的购物体验，维持市场正常运营秩序，本网站有权按照本规则规定的情形对商家经营行为采取以下管理措施： (1)、警告：指本网站通过口头或书面的形式对商家的不当行为进行提醒和告诫； (2)、商品下架：指将商家在售商品/服务转移至线上待售商品； 限制参加营销活动：指限制商家参加本网站官方发起的营销活动； (3)、删除商品：是指删除已发布的商品； (4)、删除信息：是指删除店铺、商品、活动页等位置的信息； (5)、关闭店铺：指停用商家的店铺，下架店铺内所有出售中的商品，禁止发布商品，并禁止创建店铺； 2、商家应积极提升自身经营水平，为消费者提供优质的商品及服务。 3、商家如发生危及交易安全或扰乱本网站运营秩序等行为，本网站将依照其行为的危险程度采取市场管控措施。且本网站有权依照平台规则采取违规处理并要求商家承担违约责任。 4、新闻媒体曝光或国家行政部门通报的质量不合格的品牌、品类或批次的商品，或其他要求协查的商品及店铺及本网站抽检发现问题的商品相关联的商品，本网站将依照其情形严重程度对相关商家的店铺及商品采取商品下架、商品删除等市场管理措施。 5、因商家行为引发司法诉讼的，若商家存在提供的联系方式无效、消极应对或继续违规等情形，对平台造成或可能造成实际损失或不良影响的，本网站将根据产生或可能产生后果的严重程度采取市场管理措施。 6、商家应根据协议约定或规则规定缴纳及补足保证金。若保证金余额不足或被本网站通知需要增加保证金时，且经本网站催缴后商家未按协议约定期限缴纳或补足的，本网站有权视违约情况采取管理措施，直至商家足额缴纳为止。 7、商家发生违规行为的，其违规行为应当及时纠正，本网站开放平台将根据事实证据按对商家进行违规行为管理。 8、本网站通过其他商家、权利人等的投诉或本网站排查等方式发现商家的违规行为。 9、商家自行做出的承诺或说明与本规则相悖的，该承诺或说明将不作为本网站处理违规申诉的依据。除证据有误或判断错误的情形外，本网站不终止或撤销对违规行为的处理。 六、附则 1、本网站开放平台商家的行为，发生在本管理规则生效之日以前的，适用当时的规则。发生在本管理规则生效之日以后的，适用本规则。 2、本网站可根据平台运营情况随时调整本管理规则。 3、商家应遵守国家法律、行政法规、部门规章等规范性文件。对任何涉嫌违反国家法律、行政法规、部门规章等规范性文件的行为，本规则已有规定的，适用于本规则。本规则尚无规定的，本网站有权酌情处理。但本网站对商家的处理不免除其应承担的法律责任。商家在本网站的任何行为，应同时遵守与本网站及其关联公司签订的各项协议。</p>
+<p>
+<span class="small text-gray">聚点商城</span>
+<span class="small text-gray" title="2018-01-25 00:01:26">2018-01-25</span>
+</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<footer class="main-footer">
+<div class="container">
+<div class="promise">
+<div class="row">
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-roundcheck"></i>
+</div>
+<div class="pull-left">
+<strong>品质保障</strong>
+<p>品质护航 购物无忧</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-time"></i>
+</div>
+<div class="pull-left">
+<strong>极速物流</strong>
+<p>多仓直发 极速配送</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-like"></i>
+</div>
+<div class="pull-left">
+<strong>售后无忧</strong>
+<p>退换无忧 维修无忧</p>
+</div>
+</div>
+<div class="col-xs-3">
+<div class="pull-left">
+<i class="iconfont icon-goodsfavor"></i>
+</div>
+<div class="pull-left">
+<strong>天天低价</strong>
+<p>天天低价 帮您省钱</p>
+</div>
+</div>
+</div>
+</div>
+<div class="row">
+<div class="col-xs-4">
+<ul class="contact">
+<li>
+<i class="iconfont icon-phone"></i>
+<strong>020-89855351 </strong>
+</li>
+
+<li>
+<i class="iconfont icon-location"></i>
+广东省广州市黄埔区大沙地东319号保利中誉广场2607室
+</li>
+</ul>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>购物指南</dt>
+<dd>
+<a href="../detail/16_1.html" >免费注册</a>
+</dd>
+<dd>
+<a href="../detail/15_1.html" >购物流程</a>
+</dd>
+<dd>
+<a href="../detail/17_1.html" >会员等级</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>支付方式</dt>
+<dd>
+<a href="../detail/19_1.html" >货到付款</a>
+</dd>
+<dd>
+<a href="../detail/20_1.html" >网银支付</a>
+</dd>
+<dd>
+<a href="../detail/21_1.html" >银行转帐</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>售后服务</dt>
+<dd>
+<a href="../detail/31_1.html" >退换货政策</a>
+</dd>
+<dd>
+<a href="../detail/33_1.html" >退换货申请</a>
+</dd>
+<dd>
+<a href="../detail/34_1.html" >退款说明</a>
+</dd>
+</dl>
+</div>
+<div class="col-xs-2">
+<dl class="help">
+<dt>商家服务</dt>
+<dd>
+<a href="../detail/36_1.html" >商家入驻</a>
+</dd>
+<dd>
+<a href="../detail/37_1.html" >商家帮助</a>
+</dd>
+<dd>
+<a href="../detail/38_1.html" >运营服务</a>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+<div class="bottom-nav">
+<ul class="clearfix">
+<li>
+<a href="/article/detail/39_1.html" >隐私政策</a>
+|
+</li>
+<li>
+<a href="/article/detail/39_1.html" >法律声明</a>
+|
+</li>
+<li>
+<a href="/article/detail/37_1.html" >客户服务</a>
+
+</li>
+
+</ul>
+<p><a href="http://www.beian.miit.gov.cn/" class="colorD" target="_blank" rel="noopener noreferrer">Copyright©2020. 广州众咖信息科技服务有限公司 All Rights Reserved 粤ICP备18042113号-2</a></p>
+</div>
+</footer></body>
+</html>
